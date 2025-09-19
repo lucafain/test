@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel de administración - Frigorífico Kosher</title>
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+  <header class="subheader">
+    <a class="subheader__back" href="index.html">&larr; Inicio</a>
+    <h1>Panel de administración</h1>
+  </header>
+
+  <main class="container" id="adminApp">
+    <section class="card" id="loginSection">
+      <h2>Identificación</h2>
+      <p>Ingrese su nombre para acceder al panel.</p>
+      <form id="loginForm" class="form">
+        <label for="adminName">Nombre del administrador</label>
+        <input id="adminName" name="adminName" type="text" required placeholder="Ej: Juan Pérez">
+        <button class="button" type="submit">Ingresar</button>
+      </form>
+    </section>
+
+    <section class="card card--hidden" id="panelSection">
+      <div class="panel__header">
+        <h2>Bienvenido, <span id="adminNameDisplay"></span></h2>
+        <button class="button button--secondary" id="logoutButton">Cerrar sesión</button>
+      </div>
+
+      <div class="grid">
+        <section class="card" id="inventorySection">
+          <h3>Stock y precios</h3>
+          <p>Actualice el stock disponible y el precio por cajón.</p>
+          <div class="table" role="table">
+            <div class="table__header" role="row">
+              <span role="columnheader">Cajón</span>
+              <span role="columnheader">Stock disponible</span>
+              <span role="columnheader">Precio (ARS)</span>
+            </div>
+            <div id="inventoryRows"></div>
+          </div>
+          <button class="button" id="saveInventory">Guardar cambios</button>
+        </section>
+
+        <section class="card" id="ordersSection">
+          <h3>Historial de pedidos</h3>
+          <p>Últimos pedidos enviados por los clientes.</p>
+          <ul class="history" id="ordersHistory"></ul>
+        </section>
+
+        <section class="card" id="adminHistorySection">
+          <h3>Ingresos de administradores</h3>
+          <p>Registro de accesos recientes al panel.</p>
+          <ul class="history" id="adminHistory"></ul>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>&copy; <span id="year"></span> Frigorífico Kosher. Solo para uso interno.</p>
+  </footer>
+
+  <script src="assets/js/admin.js"></script>
+</body>
+</html>
