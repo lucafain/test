@@ -128,6 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const loginError = document.getElementById('loginError');
   const processingSection = document.getElementById('adminProcessingSection');
   const processingBar = document.getElementById('adminProcessingBar');
+  const processingLabel = document.getElementById('adminProcessingPercent');
 
   ensureManualPaymentWeekActive();
 
@@ -234,7 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
       panelSection.classList.remove('card--hidden');
       activateCard(panelSection);
       updateClearOrdersButton(loadOrders().length > 0);
-    });
+    }, processingLabel);
   });
 
   logoutButton.addEventListener('click', () => {
@@ -1242,7 +1243,7 @@ function activateCard(cardElement) {
   }, cleanupDelay);
 }
 
-function startProcessingTransition(section, bar, callback) {
+function startProcessingTransition(section, bar, callback, label) {
   if (!section) {
     callback();
     return;
@@ -1255,16 +1256,27 @@ function startProcessingTransition(section, bar, callback) {
     resetProgressBar(bar);
   }
 
+  if (label) {
+    resetProgressLabel(label);
+  }
+
   const duration = shouldReduceMotion() ? 0 : 4000;
 
   if (bar) {
     animateProgressBar(bar, duration);
   }
 
+  if (label) {
+    animateProgressLabel(label, duration);
+  }
+
   if (duration === 0) {
     section.classList.add('card--hidden');
     if (bar) {
       resetProgressBar(bar);
+    }
+    if (label) {
+      completeProgressLabel(label);
     }
     callback();
     return;
@@ -1274,6 +1286,9 @@ function startProcessingTransition(section, bar, callback) {
     section.classList.add('card--hidden');
     if (bar) {
       resetProgressBar(bar);
+    }
+    if (label) {
+      completeProgressLabel(label);
     }
     callback();
   }, duration);
@@ -1305,6 +1320,66 @@ function resetProgressBar(bar) {
   bar.classList.remove('progress__bar--animate');
   bar.style.transitionDuration = '';
   bar.style.width = '0%';
+}
+
+function animateProgressLabel(label, duration) {
+  if (!label) {
+    return;
+  }
+
+  cancelProgressLabelAnimation(label);
+
+  if (duration === 0) {
+    label.textContent = '100%';
+    return;
+  }
+
+  label.textContent = '0%';
+  const start = performance.now();
+
+  function update(now) {
+    const elapsed = now - start;
+    const progress = Math.min(elapsed / duration, 1);
+    label.textContent = `${Math.round(progress * 100)}%`;
+
+    if (progress < 1) {
+      const frameId = requestAnimationFrame(update);
+      label.dataset.progressAnimationFrame = String(frameId);
+    } else {
+      delete label.dataset.progressAnimationFrame;
+    }
+  }
+
+  const frameId = requestAnimationFrame(update);
+  label.dataset.progressAnimationFrame = String(frameId);
+}
+
+function resetProgressLabel(label) {
+  if (!label) {
+    return;
+  }
+
+  cancelProgressLabelAnimation(label);
+  label.textContent = '0%';
+}
+
+function completeProgressLabel(label) {
+  if (!label) {
+    return;
+  }
+
+  cancelProgressLabelAnimation(label);
+  label.textContent = '100%';
+}
+
+function cancelProgressLabelAnimation(label) {
+  const frameId = Number.parseInt(label?.dataset?.progressAnimationFrame ?? '', 10);
+  if (Number.isFinite(frameId)) {
+    cancelAnimationFrame(frameId);
+  }
+  if (label?.dataset) {
+    delete label.dataset.progressAnimationFrame;
+  }
 }
 
 function shouldReduceMotion() {

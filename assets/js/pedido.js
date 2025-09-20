@@ -34,6 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const globalAlert = document.getElementById('globalAlert');
   const processingSection = document.getElementById('processingSection');
   const processingBar = document.getElementById('processingBar');
+  const processingLabel = document.getElementById('processingPercent');
 
   let inventory = normalizeInventory(loadInventory());
   let pendingOrderContext = null;
@@ -115,7 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
           globalAlert,
           { preserveAlerts: true, preserveMessage: true }
         );
-      });
+      }, processingLabel);
     });
   }
 
@@ -448,7 +449,7 @@ function renderOrderDetails(container, order, crateData) {
     return;
   }
 
-  const details = buildOrderDetails(order, crateData);
+  const { details } = buildOrderDetails(order, crateData);
   container.innerHTML = details.map((detail) => `<p>${detail}</p>`).join('');
 }
 
@@ -480,11 +481,13 @@ function restoreOrderFormValues(form, order) {
 }
 
 function buildOrderDetails(order, crateData) {
+  const crateLabel = crateData?.label ?? order.crateSize;
+
   const details = [
     `<strong>Comercio:</strong> ${order.storeName}`,
     `<strong>Dirección:</strong> ${order.storeAddress}`,
     `<strong>Cantidad:</strong> ${order.quantity} ${order.quantity === 1 ? 'cajón' : 'cajones'}`,
-    `<strong>Cajón solicitado:</strong> ${order.crateSize}`
+    `<strong>Cajón solicitado:</strong> ${crateLabel}`
   ];
 
   const normalizedUnitPrice = Number.isFinite(order.unitPrice)
@@ -507,11 +510,39 @@ function buildOrderDetails(order, crateData) {
     details.push(`<strong>Total estimado:</strong> ${formatCurrency(normalizedTotalPrice)}`);
   }
 
-  return details;
+  return {
+    details,
+    crateLabel,
+    unitPrice: normalizedUnitPrice,
+    totalPrice: normalizedTotalPrice
+  };
 }
 
 function renderConfirmation(container, order, crateData) {
-  renderOrderDetails(container, order, crateData);
+  if (!container || !order) {
+    return;
+  }
+
+  const { details, crateLabel, totalPrice } = buildOrderDetails(order, crateData);
+  const pluralized = order.quantity === 1 ? 'cajón' : 'cajones';
+
+  const summaryFragments = [
+    'Registramos tu pedido con éxito.',
+    `Elegiste ${order.quantity} ${pluralized} del ${crateLabel}.`
+  ];
+
+  if (Number.isFinite(totalPrice) && totalPrice > 0) {
+    summaryFragments.push(`El total estimado es ${formatCurrency(totalPrice)}.`);
+  }
+
+  summaryFragments.push('Nos comunicaremos para coordinar la disponibilidad.');
+
+  container.innerHTML = `
+    <p class="confirmation__message">${summaryFragments.join(' ')}</p>
+    <ul class="confirmation__list">
+      ${details.map((detail) => `<li>${detail}</li>`).join('')}
+    </ul>
+  `;
 }
 
 function showLockedConfirmation(orderSection, confirmationSection, confirmationDetails, inventory) {
@@ -621,7 +652,7 @@ function activateCard(cardElement) {
   }
 }
 
-function startProcessingTransition(section, bar, callback) {
+function startProcessingTransition(section, bar, callback, label) {
   if (!section) {
     callback();
     return;
@@ -634,16 +665,27 @@ function startProcessingTransition(section, bar, callback) {
     resetProgressBar(bar);
   }
 
+  if (label) {
+    resetProgressLabel(label);
+  }
+
   const duration = shouldReduceMotion() ? 0 : 4000;
 
   if (bar) {
     animateProgressBar(bar, duration);
   }
 
+  if (label) {
+    animateProgressLabel(label, duration);
+  }
+
   if (duration === 0) {
     section.classList.add('card--hidden');
     if (bar) {
       resetProgressBar(bar);
+    }
+    if (label) {
+      completeProgressLabel(label);
     }
     callback();
     return;
@@ -653,6 +695,9 @@ function startProcessingTransition(section, bar, callback) {
     section.classList.add('card--hidden');
     if (bar) {
       resetProgressBar(bar);
+    }
+    if (label) {
+      completeProgressLabel(label);
     }
     callback();
   }, duration);
@@ -684,6 +729,66 @@ function resetProgressBar(bar) {
   bar.classList.remove('progress__bar--animate');
   bar.style.transitionDuration = '';
   bar.style.width = '0%';
+}
+
+function animateProgressLabel(label, duration) {
+  if (!label) {
+    return;
+  }
+
+  cancelProgressLabelAnimation(label);
+
+  if (duration === 0) {
+    label.textContent = '100%';
+    return;
+  }
+
+  label.textContent = '0%';
+  const start = performance.now();
+
+  function update(now) {
+    const elapsed = now - start;
+    const progress = Math.min(elapsed / duration, 1);
+    label.textContent = `${Math.round(progress * 100)}%`;
+
+    if (progress < 1) {
+      const frameId = requestAnimationFrame(update);
+      label.dataset.progressAnimationFrame = String(frameId);
+    } else {
+      delete label.dataset.progressAnimationFrame;
+    }
+  }
+
+  const frameId = requestAnimationFrame(update);
+  label.dataset.progressAnimationFrame = String(frameId);
+}
+
+function resetProgressLabel(label) {
+  if (!label) {
+    return;
+  }
+
+  cancelProgressLabelAnimation(label);
+  label.textContent = '0%';
+}
+
+function completeProgressLabel(label) {
+  if (!label) {
+    return;
+  }
+
+  cancelProgressLabelAnimation(label);
+  label.textContent = '100%';
+}
+
+function cancelProgressLabelAnimation(label) {
+  const frameId = Number.parseInt(label?.dataset?.progressAnimationFrame ?? '', 10);
+  if (Number.isFinite(frameId)) {
+    cancelAnimationFrame(frameId);
+  }
+  if (label?.dataset) {
+    delete label.dataset.progressAnimationFrame;
+  }
 }
 
 function shouldReduceMotion() {
