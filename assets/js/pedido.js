@@ -27,6 +27,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let inventory = normalizeInventory(loadInventory());
 
+  resetOrderLockIfNeeded();
+
   if (isOrderLocked()) {
     showLockedConfirmation(orderSection, confirmationSection, confirmationDetails, inventory);
     return;
@@ -281,6 +283,31 @@ function lockOrdering() {
   localStorage.setItem(ORDER_LOCK_KEY, 'true');
 }
 
+function resetOrderLockIfNeeded() {
+  if (localStorage.getItem(ORDER_LOCK_KEY) !== 'true') {
+    return;
+  }
+
+  const lastOrder = getLastOrder();
+  const orderTimestamp = Number(lastOrder?.timestamp);
+
+  if (!Number.isFinite(orderTimestamp)) {
+    localStorage.removeItem(ORDER_LOCK_KEY);
+    return;
+  }
+
+  const nextMondayTimestamp = calculateNextMondayTimestamp(orderTimestamp);
+
+  if (!Number.isFinite(nextMondayTimestamp)) {
+    localStorage.removeItem(ORDER_LOCK_KEY);
+    return;
+  }
+
+  if (Date.now() >= nextMondayTimestamp) {
+    localStorage.removeItem(ORDER_LOCK_KEY);
+  }
+}
+
 function getLastOrder() {
   const stored = localStorage.getItem(ORDER_STORAGE_KEY);
   if (stored) {
@@ -346,4 +373,30 @@ function showLockedConfirmation(orderSection, confirmationSection, confirmationD
   } else if (confirmationDetails) {
     confirmationDetails.innerHTML = '<p>No hay detalles para mostrar en este momento.</p>';
   }
+}
+
+function calculateNextMondayTimestamp(referenceTimestamp) {
+  const timestampNumber = Number(referenceTimestamp);
+
+  if (!Number.isFinite(timestampNumber)) {
+    return null;
+  }
+
+  const referenceDate = new Date(timestampNumber);
+
+  if (Number.isNaN(referenceDate.getTime())) {
+    return null;
+  }
+
+  const weekStart = new Date(referenceDate);
+  weekStart.setHours(0, 0, 0, 0);
+
+  const dayOfWeek = weekStart.getDay();
+  const daysSinceMonday = (dayOfWeek + 6) % 7;
+  weekStart.setDate(weekStart.getDate() - daysSinceMonday);
+
+  const nextMonday = new Date(weekStart);
+  nextMonday.setDate(weekStart.getDate() + 7);
+
+  return nextMonday.getTime();
 }

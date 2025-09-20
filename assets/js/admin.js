@@ -5,10 +5,10 @@ const STORAGE_KEYS = {
   currentAdmin: 'frigorifico_current_admin'
 };
 
-const AUTHORIZED_ADMIN = {
-  username: 'martin',
-  password: '1234'
-};
+const AUTHORIZED_ADMINS = [
+  { username: 'martin', password: '1234', displayName: 'Martin' },
+  { username: 'luca', password: 'Luca-admin', displayName: 'Luca' }
+];
 
 const CRATE_OPTIONS = [
   { id: 'X', label: 'Cajón X' },
@@ -58,7 +58,9 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    if (!isAuthorized(name, password)) {
+    const adminRecord = getAuthorizedAdmin(name);
+
+    if (!adminRecord || adminRecord.password !== password) {
       showLoginError(loginError, 'Usuario o contraseña incorrectos.');
       loginForm.adminPassword.value = '';
       loginForm.adminPassword.focus();
@@ -67,17 +69,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     hideLoginError(loginError);
 
-    adminNameDisplay.textContent = name;
+    const adminDisplayName = adminRecord.displayName ?? adminRecord.username;
+
+    adminNameDisplay.textContent = adminDisplayName;
     loginSection.classList.add('card--hidden');
     panelSection.classList.remove('card--hidden');
     loginForm.reset();
 
-    persistAdminLogin(name);
+    persistAdminLogin(adminDisplayName);
     renderAdminHistory(adminHistoryList);
 
     localStorage.setItem(
       STORAGE_KEYS.currentAdmin,
-      JSON.stringify({ name })
+      JSON.stringify({
+        username: adminRecord.username,
+        name: adminDisplayName
+      })
     );
   });
 
@@ -126,8 +133,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const storedAdminRaw = localStorage.getItem(STORAGE_KEYS.currentAdmin);
   const storedAdmin = parseStoredAdmin(storedAdminRaw);
-  if (storedAdmin && isAuthorized(storedAdmin.name, AUTHORIZED_ADMIN.password)) {
-    adminNameDisplay.textContent = storedAdmin.name;
+  const matchedAdmin = storedAdmin
+    ? getAuthorizedAdmin(storedAdmin.username ?? storedAdmin.name)
+    : null;
+
+  if (matchedAdmin) {
+    const adminDisplayName = storedAdmin?.name ?? matchedAdmin.displayName ?? matchedAdmin.username;
+    adminNameDisplay.textContent = adminDisplayName;
     loginSection.classList.add('card--hidden');
     panelSection.classList.remove('card--hidden');
   } else if (storedAdminRaw) {
@@ -135,11 +147,16 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-function isAuthorized(name, password) {
-  const normalizedName = name.toLowerCase();
+function getAuthorizedAdmin(name) {
+  if (!name) {
+    return null;
+  }
+
+  const normalizedName = name.toString().toLowerCase();
   return (
-    normalizedName === AUTHORIZED_ADMIN.username &&
-    password === AUTHORIZED_ADMIN.password
+    AUTHORIZED_ADMINS.find(
+      (admin) => admin.username.toLowerCase() === normalizedName
+    ) ?? null
   );
 }
 
@@ -150,8 +167,18 @@ function parseStoredAdmin(rawValue) {
 
   try {
     const parsed = JSON.parse(rawValue);
-    if (parsed && typeof parsed.name === 'string') {
-      return parsed;
+    if (parsed && typeof parsed === 'object') {
+      const result = {};
+      if (typeof parsed.username === 'string') {
+        result.username = parsed.username;
+      }
+      if (typeof parsed.name === 'string') {
+        result.name = parsed.name;
+      }
+
+      if ('username' in result || 'name' in result) {
+        return result;
+      }
     }
   } catch (error) {
     if (typeof rawValue === 'string') {
