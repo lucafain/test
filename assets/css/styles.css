@@ -80,6 +80,22 @@ a {
   background-color: var(--primary);
 }
 
+.button--danger {
+  background-color: #c0392b;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none;
+  box-shadow: none;
+}
+
+.button--danger:hover,
+.button--danger:focus {
+  box-shadow: 0 12px 20px rgba(192, 57, 43, 0.35);
+}
+
 .container {
   max-width: 960px;
   margin: -3rem auto 3rem;
@@ -284,10 +300,37 @@ a {
   padding: 0;
   margin: 0;
   display: grid;
+  gap: 1rem;
+}
+
+.history > li {
+  padding: 1rem;
+  border-radius: var(--radius);
+  background: rgba(31, 111, 139, 0.08);
+}
+
+.history__groupTitle {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.history__groupList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
   gap: 0.75rem;
 }
 
-.history li {
+.history__item {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  background: rgba(31, 111, 139, 0.12);
+  line-height: 1.4;
+}
+
+.history__empty {
   padding: 0.75rem 1rem;
   border-radius: var(--radius);
   background: rgba(31, 111, 139, 0.08);
@@ -350,6 +393,18 @@ a {
   margin-bottom: 1.5rem;
 }
 
+.panel__sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.panel__sectionHeader h3 {
+  margin: 0;
+}
+
 @media (max-width: 640px) {
   .hero {
     padding: 4rem 1.5rem;
@@ -367,5 +422,14 @@ a {
   .panel__header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .panel__sectionHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .panel__sectionHeader .button {
+    width: 100%;
   }
 }

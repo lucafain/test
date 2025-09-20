@@ -48,7 +48,16 @@
         </section>
 
         <section class="card" id="ordersSection">
-          <h3>Historial de pedidos</h3>
+          <div class="panel__sectionHeader">
+            <h3>Historial de pedidos</h3>
+            <button
+              class="button button--danger"
+              type="button"
+              id="clearOrdersButton"
+              hidden
+              disabled
+            >Borrar historial</button>
+          </div>
           <p>Últimos pedidos enviados por los clientes.</p>
           <ul class="history" id="ordersHistory"></ul>
         </section>

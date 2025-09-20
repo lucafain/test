@@ -94,7 +94,14 @@ document.addEventListener('DOMContentLoaded', () => {
       orderForm.reset();
       hideMessage(orderMessage);
       hideAlert(globalAlert);
-      renderCrateOptions(crateOptionsContainer, inventory, submitButton, orderMessage, globalAlert);
+      renderCrateOptions(
+        crateOptionsContainer,
+        inventory,
+        submitButton,
+        orderMessage,
+        globalAlert,
+        { preserveAlerts: true, preserveMessage: true }
+      );
     });
   }
 
@@ -254,10 +261,20 @@ function normalizeInventory(inventory) {
   });
 }
 
-function renderCrateOptions(container, inventory, submitButton, messageContainer, alertContainer) {
+function renderCrateOptions(
+  container,
+  inventory,
+  submitButton,
+  messageContainer,
+  alertContainer,
+  options
+) {
   if (!container) {
     return;
   }
+
+  const preserveAlerts = !!(options && typeof options === 'object' && options.preserveAlerts);
+  const preserveMessage = !!(options && typeof options === 'object' && options.preserveMessage);
 
   let availableCount = 0;
 
@@ -305,8 +322,12 @@ function renderCrateOptions(container, inventory, submitButton, messageContainer
         + 'Por favor, vuelva a intentar más tarde.'
     );
   } else {
-    hideMessage(messageContainer);
-    hideAlert(alertContainer);
+    if (!preserveMessage) {
+      hideMessage(messageContainer);
+    }
+    if (!preserveAlerts) {
+      hideAlert(alertContainer);
+    }
   }
 }
 

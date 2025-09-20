@@ -10,6 +10,14 @@ const AUTHORIZED_ADMINS = [
   { username: 'luca', password: 'Luca-admin', displayName: 'Luca' }
 ];
 
+const WEEK_RANGE_FORMATTER = new Intl.DateTimeFormat('es-AR', {
+  day: 'numeric',
+  month: 'long'
+});
+
+let clearOrdersButtonRef = null;
+let currentAdminRecord = null;
+
 const CRATE_OPTIONS = [
   { id: 'X', label: 'Cajón X' },
   { id: '6', label: 'Cajón de 6 cabezas' },
@@ -33,14 +41,36 @@ document.addEventListener('DOMContentLoaded', () => {
   const inventoryRowsContainer = document.getElementById('inventoryRows');
   const saveInventoryButton = document.getElementById('saveInventory');
   const ordersHistory = document.getElementById('ordersHistory');
+  clearOrdersButtonRef = document.getElementById('clearOrdersButton');
   const adminHistoryList = document.getElementById('adminHistory');
   const loginError = document.getElementById('loginError');
 
   let inventoryState = loadInventory();
 
   renderInventoryRows(inventoryState, inventoryRowsContainer);
-  renderOrdersHistory(ordersHistory);
+  const hasOrders = renderOrdersHistory(ordersHistory);
+  updateClearOrdersButton(hasOrders);
   renderAdminHistory(adminHistoryList);
+
+  if (clearOrdersButtonRef) {
+    clearOrdersButtonRef.addEventListener('click', () => {
+      if (!currentAdminRecord || !isHistoryClearAllowed(currentAdminRecord)) {
+        return;
+      }
+
+      const confirmation = window.confirm(
+        '¿Seguro que desea borrar todo el historial de pedidos? Esta acción no se puede deshacer.'
+      );
+
+      if (!confirmation) {
+        return;
+      }
+
+      localStorage.removeItem(STORAGE_KEYS.orders);
+      const hasOrdersAfterClear = renderOrdersHistory(ordersHistory);
+      updateClearOrdersButton(hasOrdersAfterClear);
+    });
+  }
 
   loginForm.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -71,6 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const adminDisplayName = adminRecord.displayName ?? adminRecord.username;
 
+    currentAdminRecord = adminRecord;
     adminNameDisplay.textContent = adminDisplayName;
     loginSection.classList.add('card--hidden');
     panelSection.classList.remove('card--hidden');
@@ -78,6 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     persistAdminLogin(adminDisplayName);
     renderAdminHistory(adminHistoryList);
+    updateClearOrdersButton(loadOrders().length > 0);
 
     localStorage.setItem(
       STORAGE_KEYS.currentAdmin,
@@ -92,6 +124,8 @@ document.addEventListener('DOMContentLoaded', () => {
     panelSection.classList.add('card--hidden');
     loginSection.classList.remove('card--hidden');
     hideLoginError(loginError);
+    currentAdminRecord = null;
+    updateClearOrdersButton(false);
     localStorage.removeItem(STORAGE_KEYS.currentAdmin);
   });
 
@@ -139,9 +173,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (matchedAdmin) {
     const adminDisplayName = storedAdmin?.name ?? matchedAdmin.displayName ?? matchedAdmin.username;
+    currentAdminRecord = matchedAdmin;
     adminNameDisplay.textContent = adminDisplayName;
     loginSection.classList.add('card--hidden');
     panelSection.classList.remove('card--hidden');
+    updateClearOrdersButton(loadOrders().length > 0);
   } else if (storedAdminRaw) {
     localStorage.removeItem(STORAGE_KEYS.currentAdmin);
   }
@@ -158,6 +194,21 @@ function getAuthorizedAdmin(name) {
       (admin) => admin.username.toLowerCase() === normalizedName
     ) ?? null
   );
+}
+
+function isHistoryClearAllowed(adminRecord) {
+  if (!adminRecord) {
+    return false;
+  }
+
+  const username = (
+    adminRecord.username
+      ?? adminRecord.displayName
+      ?? adminRecord.name
+      ?? ''
+  ).toString().toLowerCase();
+
+  return username === 'martin' || username === 'luca';
 }
 
 function parseStoredAdmin(rawValue) {
@@ -244,23 +295,49 @@ function renderInventoryRows(inventory, container) {
     .join('');
 }
 
-function renderOrdersHistory(container) {
+function loadOrders() {
   const stored = localStorage.getItem(STORAGE_KEYS.orders);
-  let orders = [];
-  if (stored) {
-    try {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed)) {
-        orders = parsed;
-      }
-    } catch (error) {
-      console.error('Error al leer pedidos guardados', error);
-    }
+  if (!stored) {
+    return [];
   }
 
-  if (!orders.length) {
-    container.innerHTML = '<li>No hay pedidos registrados aún.</li>';
+  try {
+    const parsed = JSON.parse(stored);
+    if (Array.isArray(parsed)) {
+      return parsed;
+    }
+  } catch (error) {
+    console.error('Error al leer pedidos guardados', error);
+  }
+
+  return [];
+}
+
+function updateClearOrdersButton(hasOrdersParam) {
+  if (!clearOrdersButtonRef) {
     return;
+  }
+
+  if (!isHistoryClearAllowed(currentAdminRecord)) {
+    clearOrdersButtonRef.hidden = true;
+    clearOrdersButtonRef.disabled = true;
+    return;
+  }
+
+  clearOrdersButtonRef.hidden = false;
+  const hasOrders = typeof hasOrdersParam === 'boolean'
+    ? hasOrdersParam
+    : loadOrders().length > 0;
+
+  clearOrdersButtonRef.disabled = !hasOrders;
+}
+
+function renderOrdersHistory(container) {
+  const orders = loadOrders();
+
+  if (!orders.length) {
+    container.innerHTML = '<li class="history__empty">No hay pedidos registrados aún.</li>';
+    return false;
   }
 
   const formatter = new Intl.DateTimeFormat('es-AR', {
@@ -268,23 +345,121 @@ function renderOrdersHistory(container) {
     timeStyle: 'short'
   });
 
-  container.innerHTML = orders
-    .slice()
-    .reverse()
-    .map((order) => {
-      const timestamp = order.timestamp ? formatter.format(new Date(order.timestamp)) : 'Fecha no disponible';
-      const quantityNumber = Number.parseInt(order.quantity ?? '', 10);
-      const hasQuantity = Number.isFinite(quantityNumber) && quantityNumber > 0;
+  const groupsMap = new Map();
+  const ordersWithoutDate = [];
+
+  orders.forEach((order) => {
+    const timestampValue = Number(order.timestamp);
+    if (!Number.isFinite(timestampValue)) {
+      ordersWithoutDate.push(order);
+      return;
+    }
+
+    const orderDate = new Date(timestampValue);
+    if (Number.isNaN(orderDate.getTime())) {
+      ordersWithoutDate.push(order);
+      return;
+    }
+
+    const boundaries = getWeekBoundaries(orderDate);
+    const key = boundaries.start.toISOString();
+
+    if (!groupsMap.has(key)) {
+      groupsMap.set(key, { ...boundaries, orders: [] });
+    }
+
+    groupsMap.get(key).orders.push(order);
+  });
+
+  const sortedGroups = Array.from(groupsMap.values()).sort((a, b) => b.start - a.start);
+
+  if (ordersWithoutDate.length) {
+    sortedGroups.push({ start: null, end: null, orders: ordersWithoutDate.slice(), unknown: true });
+  }
+
+  const groupHtml = sortedGroups
+    .map((group) => {
+      const groupTitle = group.unknown
+        ? 'Pedidos sin fecha registrada'
+        : formatWeekRange(group.start, group.end);
+
+      const itemsHtml = group.orders
+        .slice()
+        .sort((a, b) => {
+          const timeA = Number(a.timestamp);
+          const timeB = Number(b.timestamp);
+          const safeA = Number.isFinite(timeA) ? timeA : 0;
+          const safeB = Number.isFinite(timeB) ? timeB : 0;
+          return safeB - safeA;
+        })
+        .map((order) => {
+          const timeValue = Number(order.timestamp);
+          const hasTimestamp = Number.isFinite(timeValue);
+          const timestampLabel = hasTimestamp
+            ? formatter.format(new Date(timeValue))
+            : 'Fecha no disponible';
+
+          const quantityNumber = Number.parseInt(order.quantity ?? '', 10);
+          const hasQuantity = Number.isFinite(quantityNumber) && quantityNumber > 0;
+
+          const quantityLabel = hasQuantity
+            ? `${quantityNumber} × ${order.crateSize}`
+            : order.crateSize;
+
+          return `
+            <li class="history__item">
+              <strong>${order.storeName}</strong> (${timestampLabel})<br>
+              ${order.storeAddress}<br>
+              Pedido: ${quantityLabel}
+            </li>
+          `;
+        })
+        .join('');
 
       return `
-        <li>
-          <strong>${order.storeName}</strong> (${timestamp})<br>
-          ${order.storeAddress}<br>
-          Pedido: ${hasQuantity ? `${quantityNumber} × ${order.crateSize}` : order.crateSize}
+        <li class="history__group">
+          <h4 class="history__groupTitle">${groupTitle}</h4>
+          <ul class="history__groupList">
+            ${itemsHtml}
+          </ul>
         </li>
       `;
     })
     .join('');
+
+  container.innerHTML = groupHtml;
+  return true;
+}
+
+function getWeekBoundaries(date) {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+
+  const day = start.getDay();
+  const diffToMonday = (day + 6) % 7;
+  start.setDate(start.getDate() - diffToMonday);
+
+  const end = new Date(start);
+  end.setDate(end.getDate() + 7);
+  end.setHours(0, 0, 0, 0);
+
+  return { start, end };
+}
+
+function formatWeekRange(start, end) {
+  if (!(start instanceof Date) || !(end instanceof Date)) {
+    return 'Semana sin fecha';
+  }
+
+  const sameYear = start.getFullYear() === end.getFullYear();
+  const startLabel = WEEK_RANGE_FORMATTER.format(start);
+  const endLabel = WEEK_RANGE_FORMATTER.format(end);
+
+  if (sameYear) {
+    return `Del ${startLabel} al ${endLabel} de ${start.getFullYear()}`;
+  }
+
+  return `Del ${startLabel} de ${start.getFullYear()} al ${endLabel} de ${end.getFullYear()}`;
 }
 
 function persistAdminLogin(name) {
