@@ -2,7 +2,6 @@ const STORAGE_KEYS = {
   inventory: 'frigorifico_inventory',
   orders: 'frigorifico_orders',
   adminHistory: 'frigorifico_admin_history',
-  currentAdmin: 'frigorifico_current_admin',
   adminLogs: 'frigorifico_admin_logs',
   payments: 'frigorifico_payment_status',
   paymentLogs: 'frigorifico_payment_logs',
@@ -370,14 +369,6 @@ document.addEventListener('DOMContentLoaded', () => {
     appendAdminLog('Inició sesión', adminDisplayName);
     updateAdminPermissions(currentAdminRecord);
 
-    localStorage.setItem(
-      STORAGE_KEYS.currentAdmin,
-      JSON.stringify({
-        username: adminRecord.username,
-        name: adminDisplayName
-      })
-    );
-
     loginForm.reset();
     loginSection.classList.add('card--hidden');
     panelSection.classList.add('card--hidden');
@@ -402,10 +393,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     hideLoginError(loginError);
     currentAdminRecord = null;
+    adminNameDisplay.textContent = '';
     updateClearOrdersButton(false);
     paymentsVisible = false;
     updateAdminPermissions(null);
-    localStorage.removeItem(STORAGE_KEYS.currentAdmin);
   });
 
   saveInventoryButton.addEventListener('click', () => {
@@ -488,27 +479,8 @@ document.addEventListener('DOMContentLoaded', () => {
     saveInventoryButton.disabled = false;
   });
 
-  const storedAdminRaw = localStorage.getItem(STORAGE_KEYS.currentAdmin);
-  const storedAdmin = parseStoredAdmin(storedAdminRaw);
-  const matchedAdmin = storedAdmin
-    ? getAuthorizedAdmin(storedAdmin.username ?? storedAdmin.name)
-    : null;
-
-  if (matchedAdmin) {
-    const adminDisplayName = storedAdmin?.name ?? matchedAdmin.displayName ?? matchedAdmin.username;
-    currentAdminRecord = matchedAdmin;
-    adminNameDisplay.textContent = adminDisplayName;
-    loginSection.classList.add('card--hidden');
-    panelSection.classList.remove('card--hidden');
-    updateClearOrdersButton(loadOrders().length > 0);
-    updateAdminPermissions(currentAdminRecord);
-    activateCard(panelSection);
-  } else if (storedAdminRaw) {
-    localStorage.removeItem(STORAGE_KEYS.currentAdmin);
-    activateCard(loginSection);
-  } else {
-    activateCard(loginSection);
-  }
+  updateAdminPermissions(null);
+  activateCard(loginSection);
 });
 
 function getAuthorizedAdmin(name) {
@@ -542,35 +514,6 @@ function hasAdminPermission(adminRecord, permissionKey) {
 
 function isHistoryClearAllowed(adminRecord) {
   return hasAdminPermission(adminRecord, 'clearOrders');
-}
-
-function parseStoredAdmin(rawValue) {
-  if (!rawValue) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(rawValue);
-    if (parsed && typeof parsed === 'object') {
-      const result = {};
-      if (typeof parsed.username === 'string') {
-        result.username = parsed.username;
-      }
-      if (typeof parsed.name === 'string') {
-        result.name = parsed.name;
-      }
-
-      if ('username' in result || 'name' in result) {
-        return result;
-      }
-    }
-  } catch (error) {
-    if (typeof rawValue === 'string') {
-      return { name: rawValue };
-    }
-  }
-
-  return null;
 }
 
 function getActiveAdminDisplayName() {
