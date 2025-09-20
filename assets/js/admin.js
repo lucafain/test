@@ -5,7 +5,6 @@ const STORAGE_KEYS = {
   adminLogs: 'frigorifico_admin_logs',
   payments: 'frigorifico_payment_status',
   paymentLogs: 'frigorifico_payment_logs',
-  manualPaymentWeek: 'frigorifico_manual_payment_week',
   customAdmins: 'frigorifico_custom_admins'
 };
 
@@ -72,6 +71,11 @@ const WEEK_RANGE_FORMATTER = new Intl.DateTimeFormat('es-AR', {
   month: 'long'
 });
 
+const SHORT_WEEK_RANGE_FORMATTER = new Intl.DateTimeFormat('es-AR', {
+  day: 'numeric',
+  month: 'numeric'
+});
+
 const DATE_TIME_FORMATTER = new Intl.DateTimeFormat('es-AR', {
   dateStyle: 'medium',
   timeStyle: 'short'
@@ -95,6 +99,7 @@ let paymentsContentRef = null;
 let paymentsToggleButtonRef = null;
 let paymentsListRef = null;
 let paymentsRangeLabelRef = null;
+let paymentWeekSelectorRef = null;
 let paymentLogsListRef = null;
 let adminManagementSectionRef = null;
 let addAdminFormRef = null;
@@ -103,6 +108,8 @@ let customAdminsListRef = null;
 let addAdminMessageTimeout = null;
 let paymentsVisible = false;
 let paymentOrdersCache = new Map();
+let paymentWeekOptions = [];
+let activePaymentWeekKey = null;
 
 const CRATE_OPTIONS = [
   { id: 'X', label: 'Cajón X' },
@@ -142,6 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
   paymentsToggleButtonRef = document.getElementById('paymentsToggle');
   paymentsListRef = document.getElementById('paymentsList');
   paymentsRangeLabelRef = document.getElementById('paymentsRangeLabel');
+  paymentWeekSelectorRef = document.getElementById('paymentWeekSelector');
   paymentLogsListRef = document.getElementById('paymentLogs');
   adminManagementSectionRef = document.getElementById('adminManagementSection');
   addAdminFormRef = document.getElementById('addAdminForm');
@@ -151,8 +159,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const processingSection = document.getElementById('adminProcessingSection');
   const processingBar = document.getElementById('adminProcessingBar');
   const processingLabel = document.getElementById('adminProcessingPercent');
-
-  ensureManualPaymentWeekActive();
 
   let inventoryState = loadInventory();
 
@@ -181,6 +187,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (paymentsListRef) {
     paymentsListRef.addEventListener('change', handlePaymentStatusChange);
+  }
+
+  if (paymentWeekSelectorRef) {
+    paymentWeekSelectorRef.addEventListener('click', handlePaymentWeekSelection);
   }
 
   if (clearOrdersButtonRef) {
@@ -855,6 +865,21 @@ function handlePaymentStatusChange(event) {
   }
 }
 
+function handlePaymentWeekSelection(event) {
+  const targetButton = event.target?.closest('button[data-week-key]');
+  if (!targetButton || !paymentWeekSelectorRef?.contains(targetButton)) {
+    return;
+  }
+
+  const { weekKey } = targetButton.dataset;
+  if (!weekKey || weekKey === activePaymentWeekKey) {
+    return;
+  }
+
+  activePaymentWeekKey = weekKey;
+  refreshPaymentsView();
+}
+
 function refreshPaymentsView() {
   if (!paymentsListRef || !paymentsRangeLabelRef) {
     return;
@@ -864,13 +889,38 @@ function refreshPaymentsView() {
     return;
   }
 
-  const { start, end } = getActivePaymentsWeek(new Date());
-  paymentsRangeLabelRef.textContent = formatWeekRange(start, end);
+  const orders = loadOrders();
+  paymentWeekOptions = buildPaymentWeekOptions(orders);
 
-  const startTime = start.getTime();
-  const endTime = end.getTime();
+  if (!paymentWeekOptions.length) {
+    activePaymentWeekKey = null;
+    renderPaymentWeekButtons(paymentWeekOptions);
+    paymentsRangeLabelRef.textContent = 'No hay semanas disponibles.';
+    paymentsListRef.innerHTML = '<li class="history__empty">No hay pedidos registrados aún.</li>';
+    paymentOrdersCache = new Map();
+    return;
+  }
 
-  const orders = loadOrders()
+  if (!activePaymentWeekKey || !paymentWeekOptions.some((option) => option.key === activePaymentWeekKey)) {
+    activePaymentWeekKey = paymentWeekOptions[0].key;
+  }
+
+  renderPaymentWeekButtons(paymentWeekOptions);
+
+  const activeWeek = paymentWeekOptions.find((option) => option.key === activePaymentWeekKey);
+  if (!activeWeek) {
+    paymentsRangeLabelRef.textContent = 'No hay semanas disponibles.';
+    paymentsListRef.innerHTML = '<li class="history__empty">No hay pedidos registrados aún.</li>';
+    paymentOrdersCache = new Map();
+    return;
+  }
+
+  paymentsRangeLabelRef.textContent = formatWeekRange(activeWeek.start, activeWeek.end);
+
+  const startTime = activeWeek.start.getTime();
+  const endTime = activeWeek.end.getTime();
+
+  const ordersInRange = orders
     .filter((order) => {
       const timestamp = Number(order?.timestamp);
       return Number.isFinite(timestamp) && timestamp >= startTime && timestamp <= endTime;
@@ -885,8 +935,8 @@ function refreshPaymentsView() {
 
   paymentOrdersCache = new Map();
 
-  if (!orders.length) {
-    paymentsListRef.innerHTML = '<li class="history__empty">No hay pedidos registrados en la semana actual.</li>';
+  if (!ordersInRange.length) {
+    paymentsListRef.innerHTML = '<li class="history__empty">No hay pedidos registrados en la semana seleccionada.</li>';
     return;
   }
 
@@ -894,7 +944,7 @@ function refreshPaymentsView() {
 
   const pendingOrders = [];
 
-  orders.forEach((order) => {
+  ordersInRange.forEach((order) => {
     const orderId = getOrderIdentifier(order);
     if (!orderId) {
       return;
@@ -910,7 +960,7 @@ function refreshPaymentsView() {
   });
 
   if (!pendingOrders.length) {
-    paymentsListRef.innerHTML = '<li class="history__empty">No hay pedidos pendientes de cobro en la semana actual.</li>';
+    paymentsListRef.innerHTML = '<li class="history__empty">No hay pedidos pendientes de cobro en la semana seleccionada.</li>';
     return;
   }
 
@@ -962,19 +1012,62 @@ function refreshPaymentsView() {
   paymentsListRef.innerHTML = listHtml;
 }
 
-function getActivePaymentsWeek(referenceDate) {
-  const manualWeek = loadManualPaymentWeek();
-
-  if (manualWeek) {
-    const start = new Date(manualWeek.start);
-    const end = new Date(manualWeek.end);
-
-    if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime()) && start <= end) {
-      return { start, end };
-    }
+function renderPaymentWeekButtons(weeks) {
+  if (!paymentWeekSelectorRef) {
+    return;
   }
 
-  return getWeekBoundaries(referenceDate);
+  if (!weeks.length) {
+    paymentWeekSelectorRef.innerHTML = '<p class="paymentWeeks__empty">No hay semanas registradas aún.</p>';
+    return;
+  }
+
+  const buttonsHtml = weeks
+    .map((week) => {
+      const label = formatWeekButtonLabel(week.start, week.end);
+      const isActive = week.key === activePaymentWeekKey;
+      const activeClass = isActive ? ' paymentWeeks__button--active' : '';
+      return `<button type="button" class="paymentWeeks__button${activeClass}" data-week-key="${week.key}">${label}</button>`;
+    })
+    .join('');
+
+  paymentWeekSelectorRef.innerHTML = buttonsHtml;
+}
+
+function buildPaymentWeekOptions(orders) {
+  const weeksMap = new Map();
+
+  orders.forEach((order) => {
+    const timestampValue = Number(order?.timestamp);
+    if (!Number.isFinite(timestampValue)) {
+      return;
+    }
+
+    const boundaries = getWeekBoundaries(new Date(timestampValue));
+    const key = boundaries.start.toISOString();
+
+    if (!weeksMap.has(key)) {
+      weeksMap.set(key, { key, start: boundaries.start, end: boundaries.end });
+    }
+  });
+
+  const currentBoundaries = getWeekBoundaries(new Date());
+  const currentKey = currentBoundaries.start.toISOString();
+  if (!weeksMap.has(currentKey)) {
+    weeksMap.set(currentKey, { key: currentKey, start: currentBoundaries.start, end: currentBoundaries.end });
+  }
+
+  return Array.from(weeksMap.values()).sort((a, b) => b.start - a.start);
+}
+
+function formatWeekButtonLabel(start, end) {
+  if (!(start instanceof Date) || !(end instanceof Date)) {
+    return 'Semana';
+  }
+
+  const startLabel = SHORT_WEEK_RANGE_FORMATTER.format(start);
+  const endLabel = SHORT_WEEK_RANGE_FORMATTER.format(end);
+  return `${startLabel} al ${endLabel}`;
 }
 
 function getOrderIdentifier(order) {
@@ -999,58 +1092,6 @@ function getWeekBoundaries(date) {
   end.setHours(23, 59, 59, 999);
 
   return { start, end };
-}
-
-function ensureManualPaymentWeekActive() {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-
-  const end = new Date(start);
-  end.setDate(end.getDate() + 6);
-  end.setHours(23, 59, 59, 999);
-
-  saveManualPaymentWeek(start.getTime(), end.getTime());
-}
-
-function loadManualPaymentWeek() {
-  const stored = localStorage.getItem(STORAGE_KEYS.manualPaymentWeek);
-  if (!stored) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(stored);
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      const start = Number(parsed.start);
-      const end = Number(parsed.end);
-
-      if (Number.isFinite(start) && Number.isFinite(end) && start <= end) {
-        return { start, end };
-      }
-    }
-  } catch (error) {
-    console.error('Error al leer la semana manual de pagos', error);
-  }
-
-  return null;
-}
-
-function saveManualPaymentWeek(startTime, endTime) {
-  const start = Number(startTime);
-  const end = Number(endTime);
-
-  if (!Number.isFinite(start) || !Number.isFinite(end) || start > end) {
-    return;
-  }
-
-  try {
-    localStorage.setItem(
-      STORAGE_KEYS.manualPaymentWeek,
-      JSON.stringify({ start, end })
-    );
-  } catch (error) {
-    console.error('Error al guardar la semana manual de pagos', error);
-  }
 }
 
 function formatWeekRange(start, end) {
