@@ -3,7 +3,9 @@ const STORAGE_KEYS = {
   orders: 'frigorifico_orders',
   adminHistory: 'frigorifico_admin_history',
   currentAdmin: 'frigorifico_current_admin',
-  adminLogs: 'frigorifico_admin_logs'
+  adminLogs: 'frigorifico_admin_logs',
+  payments: 'frigorifico_payment_status',
+  paymentLogs: 'frigorifico_payment_logs'
 };
 
 const AUTHORIZED_ADMINS = [
@@ -17,9 +19,29 @@ const WEEK_RANGE_FORMATTER = new Intl.DateTimeFormat('es-AR', {
   month: 'long'
 });
 
+const DATE_TIME_FORMATTER = new Intl.DateTimeFormat('es-AR', {
+  dateStyle: 'medium',
+  timeStyle: 'short'
+});
+
+const CURRENCY_FORMATTER = new Intl.NumberFormat('es-AR', {
+  style: 'currency',
+  currency: 'ARS',
+  minimumFractionDigits: 2
+});
+
 let clearOrdersButtonRef = null;
 let currentAdminRecord = null;
 let adminLogsListRef = null;
+let paymentsSectionRef = null;
+let paymentLogsSectionRef = null;
+let paymentsContentRef = null;
+let paymentsToggleButtonRef = null;
+let paymentsListRef = null;
+let paymentsRangeLabelRef = null;
+let paymentLogsListRef = null;
+let paymentsVisible = false;
+let paymentOrdersCache = new Map();
 
 const CRATE_OPTIONS = [
   { id: 'X', label: 'Cajón X' },
@@ -47,6 +69,13 @@ document.addEventListener('DOMContentLoaded', () => {
   clearOrdersButtonRef = document.getElementById('clearOrdersButton');
   const adminHistoryList = document.getElementById('adminHistory');
   adminLogsListRef = document.getElementById('adminLogs');
+  paymentsSectionRef = document.getElementById('paymentsSection');
+  paymentLogsSectionRef = document.getElementById('paymentLogsSection');
+  paymentsContentRef = document.getElementById('paymentsContent');
+  paymentsToggleButtonRef = document.getElementById('paymentsToggle');
+  paymentsListRef = document.getElementById('paymentsList');
+  paymentsRangeLabelRef = document.getElementById('paymentsRangeLabel');
+  paymentLogsListRef = document.getElementById('paymentLogs');
   const loginError = document.getElementById('loginError');
 
   let inventoryState = loadInventory();
@@ -56,6 +85,25 @@ document.addEventListener('DOMContentLoaded', () => {
   updateClearOrdersButton(hasOrders);
   renderAdminHistory(adminHistoryList);
   renderAdminLogs(adminLogsListRef);
+
+  if (paymentsToggleButtonRef) {
+    paymentsToggleButtonRef.addEventListener('click', () => {
+      if (!isAdminLuca(currentAdminRecord)) {
+        return;
+      }
+
+      paymentsVisible = true;
+      if (paymentsContentRef) {
+        paymentsContentRef.hidden = false;
+      }
+      paymentsToggleButtonRef.textContent = 'Actualizar listado';
+      refreshPaymentsView();
+    });
+  }
+
+  if (paymentsListRef) {
+    paymentsListRef.addEventListener('change', handlePaymentStatusChange);
+  }
 
   if (clearOrdersButtonRef) {
     clearOrdersButtonRef.addEventListener('click', () => {
@@ -120,6 +168,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderAdminHistory(adminHistoryList);
     updateClearOrdersButton(loadOrders().length > 0);
     appendAdminLog('Inició sesión', adminDisplayName);
+    updateAdminPermissions(currentAdminRecord);
 
     localStorage.setItem(
       STORAGE_KEYS.currentAdmin,
@@ -140,6 +189,8 @@ document.addEventListener('DOMContentLoaded', () => {
     hideLoginError(loginError);
     currentAdminRecord = null;
     updateClearOrdersButton(false);
+    paymentsVisible = false;
+    updateAdminPermissions(null);
     localStorage.removeItem(STORAGE_KEYS.currentAdmin);
   });
 
@@ -236,6 +287,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loginSection.classList.add('card--hidden');
     panelSection.classList.remove('card--hidden');
     updateClearOrdersButton(loadOrders().length > 0);
+    updateAdminPermissions(currentAdminRecord);
   } else if (storedAdminRaw) {
     localStorage.removeItem(STORAGE_KEYS.currentAdmin);
   }
@@ -499,7 +551,204 @@ function renderOrdersHistory(container) {
     .join('');
 
   container.innerHTML = groupHtml;
+
+  if (paymentsVisible && isAdminLuca(currentAdminRecord)) {
+    refreshPaymentsView();
+  }
+
   return true;
+}
+
+function updateAdminPermissions(adminRecord) {
+  const isLucaActive = isAdminLuca(adminRecord);
+
+  if (paymentsSectionRef) {
+    if (isLucaActive) {
+      paymentsSectionRef.classList.remove('card--hidden');
+      if (paymentsToggleButtonRef) {
+        paymentsToggleButtonRef.disabled = false;
+        paymentsToggleButtonRef.textContent = paymentsVisible
+          ? 'Actualizar listado'
+          : 'Ver pedidos de la semana';
+      }
+      if (paymentsVisible) {
+        if (paymentsContentRef) {
+          paymentsContentRef.hidden = false;
+        }
+        refreshPaymentsView();
+      } else if (paymentsContentRef) {
+        paymentsContentRef.hidden = true;
+      }
+    } else {
+      paymentsSectionRef.classList.add('card--hidden');
+      paymentsVisible = false;
+      if (paymentsContentRef) {
+        paymentsContentRef.hidden = true;
+      }
+      if (paymentsToggleButtonRef) {
+        paymentsToggleButtonRef.textContent = 'Ver pedidos de la semana';
+      }
+    }
+  }
+
+  if (paymentLogsSectionRef) {
+    if (isLucaActive) {
+      paymentLogsSectionRef.classList.remove('card--hidden');
+      renderPaymentLogs(paymentLogsListRef);
+    } else {
+      paymentLogsSectionRef.classList.add('card--hidden');
+      if (paymentLogsListRef) {
+        paymentLogsListRef.innerHTML = '';
+      }
+    }
+  }
+}
+
+function isAdminLuca(adminRecord) {
+  if (!adminRecord) {
+    return false;
+  }
+
+  const username = (
+    adminRecord.username
+      ?? adminRecord.displayName
+      ?? adminRecord.name
+      ?? ''
+  ).toString().toLowerCase();
+
+  return username === 'luca';
+}
+
+function handlePaymentStatusChange(event) {
+  const target = event.target;
+  if (!target || !target.matches('select[data-order-id]')) {
+    return;
+  }
+
+  if (!isAdminLuca(currentAdminRecord)) {
+    return;
+  }
+
+  const orderId = target.dataset.orderId;
+  if (!orderId) {
+    return;
+  }
+
+  const desiredStatus = target.value === 'paid' ? 'paid' : 'pending';
+  const order = paymentOrdersCache.get(orderId);
+  if (!order) {
+    return;
+  }
+
+  const adminName = getActiveAdminDisplayName();
+  const updated = updatePaymentState(orderId, desiredStatus, adminName, order);
+
+  if (updated) {
+    refreshPaymentsView();
+  }
+}
+
+function refreshPaymentsView() {
+  if (!paymentsListRef || !paymentsRangeLabelRef) {
+    return;
+  }
+
+  if (!isAdminLuca(currentAdminRecord)) {
+    return;
+  }
+
+  const { start, end } = getWeekBoundaries(new Date());
+  paymentsRangeLabelRef.textContent = formatWeekRange(start, end);
+
+  const startTime = start.getTime();
+  const endTime = end.getTime();
+
+  const orders = loadOrders()
+    .filter((order) => {
+      const timestamp = Number(order?.timestamp);
+      return Number.isFinite(timestamp) && timestamp >= startTime && timestamp <= endTime;
+    })
+    .sort((a, b) => {
+      const timeA = Number(a?.timestamp);
+      const timeB = Number(b?.timestamp);
+      const safeA = Number.isFinite(timeA) ? timeA : 0;
+      const safeB = Number.isFinite(timeB) ? timeB : 0;
+      return safeB - safeA;
+    });
+
+  paymentOrdersCache = new Map();
+
+  if (!orders.length) {
+    paymentsListRef.innerHTML = '<li class="history__empty">No hay pedidos registrados en la semana actual.</li>';
+    return;
+  }
+
+  const paymentStates = loadPaymentStates();
+
+  const listHtml = orders
+    .map((order) => {
+      const orderId = getOrderIdentifier(order);
+      if (!orderId) {
+        return '';
+      }
+
+      paymentOrdersCache.set(orderId, order);
+
+      const timestamp = Number(order.timestamp);
+      const timestampLabel = Number.isFinite(timestamp)
+        ? DATE_TIME_FORMATTER.format(new Date(timestamp))
+        : 'Fecha no disponible';
+
+      const quantityNumber = Number.parseInt(order.quantity ?? '', 10);
+      const hasQuantity = Number.isFinite(quantityNumber) && quantityNumber > 0;
+      const crateLabel = order.crateSize ?? 'Pedido sin detalle';
+      const quantityLabel = hasQuantity ? `${quantityNumber} × ${crateLabel}` : crateLabel;
+
+      const totalValue = Number(order.totalPrice);
+      const showTotal = Number.isFinite(totalValue) && totalValue > 0;
+      const totalLabel = showTotal
+        ? `<div class="payment__meta">Total estimado: ${formatCurrencyValue(totalValue)}</div>`
+        : '';
+
+      const stateRecord = paymentStates[orderId] ?? {};
+      const statusValue = stateRecord.status === 'paid' ? 'paid' : 'pending';
+      const updatedMeta = stateRecord.updatedAt
+        ? `Actualizado por ${stateRecord.admin ?? 'Administrador'} el ${DATE_TIME_FORMATTER.format(new Date(stateRecord.updatedAt))}`
+        : 'Sin registro de cobro.';
+
+      return `
+        <li class="history__item">
+          <div class="payment__header">
+            <strong>${order.storeName ?? 'Cliente sin nombre'}</strong>
+            <span class="payment__meta">${timestampLabel}</span>
+          </div>
+          <div class="payment__details">${order.storeAddress ?? 'Dirección no indicada'}</div>
+          <div class="payment__details">Pedido: ${quantityLabel}</div>
+          ${totalLabel}
+          <div class="payment__control">
+            <label for="payment-status-${orderId}">Cobrado</label>
+            <select id="payment-status-${orderId}" class="payment__statusSelect" data-order-id="${orderId}">
+              <option value="pending"${statusValue === 'pending' ? ' selected' : ''}>No</option>
+              <option value="paid"${statusValue === 'paid' ? ' selected' : ''}>Sí</option>
+            </select>
+            <span class="payment__meta">${updatedMeta}</span>
+          </div>
+        </li>
+      `;
+    })
+    .filter(Boolean)
+    .join('');
+
+  paymentsListRef.innerHTML = listHtml;
+}
+
+function getOrderIdentifier(order) {
+  const timestamp = Number(order?.timestamp);
+  if (Number.isFinite(timestamp) && timestamp > 0) {
+    return String(timestamp);
+  }
+
+  return null;
 }
 
 function getWeekBoundaries(date) {
@@ -653,4 +902,151 @@ function renderAdminLogs(container) {
       </li>
     `)
     .join('');
+}
+
+function loadPaymentStates() {
+  const stored = localStorage.getItem(STORAGE_KEYS.payments);
+  if (!stored) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(stored);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed;
+    }
+  } catch (error) {
+    console.error('Error al leer el estado de pagos', error);
+  }
+
+  return {};
+}
+
+function persistPaymentStates(states) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.payments, JSON.stringify(states));
+  } catch (error) {
+    console.error('Error al guardar el estado de pagos', error);
+  }
+}
+
+function updatePaymentState(orderId, status, adminName, order) {
+  if (!orderId) {
+    return false;
+  }
+
+  const sanitizedStatus = status === 'paid' ? 'paid' : 'pending';
+  const states = loadPaymentStates();
+  const previousStatus = states[orderId]?.status ?? 'pending';
+
+  if (previousStatus === sanitizedStatus) {
+    return false;
+  }
+
+  const safeAdminName = typeof adminName === 'string' && adminName.trim()
+    ? adminName.trim()
+    : 'Administrador';
+
+  states[orderId] = {
+    status: sanitizedStatus,
+    updatedAt: Date.now(),
+    admin: safeAdminName
+  };
+
+  persistPaymentStates(states);
+
+  const storeName = typeof order?.storeName === 'string' && order.storeName.trim()
+    ? order.storeName.trim()
+    : 'Cliente sin nombre';
+  const crateLabel = order?.crateSize ?? 'Pedido';
+  const quantityNumber = Number.parseInt(order?.quantity ?? '', 10);
+  const hasQuantity = Number.isFinite(quantityNumber) && quantityNumber > 0;
+  const quantityLabel = hasQuantity ? `${quantityNumber} × ${crateLabel}` : crateLabel;
+  const totalValue = Number(order?.totalPrice);
+  const totalFragment = Number.isFinite(totalValue) && totalValue > 0
+    ? ` (total estimado ${formatCurrencyValue(totalValue)})`
+    : '';
+
+  const action = sanitizedStatus === 'paid'
+    ? `Marcó como cobrado el pedido de ${storeName} (${quantityLabel})${totalFragment}`
+    : `Marcó como pendiente el pedido de ${storeName} (${quantityLabel})${totalFragment}`;
+
+  appendPaymentLog(action, safeAdminName);
+  return true;
+}
+
+function loadPaymentLogs() {
+  const stored = localStorage.getItem(STORAGE_KEYS.paymentLogs);
+  if (!stored) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(stored);
+    if (Array.isArray(parsed)) {
+      return parsed;
+    }
+  } catch (error) {
+    console.error('Error al leer el registro de pagos', error);
+  }
+
+  return [];
+}
+
+function appendPaymentLog(action, adminName) {
+  if (!action) {
+    return;
+  }
+
+  const logs = loadPaymentLogs();
+  logs.push({
+    action,
+    admin: adminName ?? 'Administrador',
+    timestamp: Date.now()
+  });
+
+  const trimmedLogs = logs.slice(-50);
+
+  try {
+    localStorage.setItem(STORAGE_KEYS.paymentLogs, JSON.stringify(trimmedLogs));
+  } catch (error) {
+    console.error('Error al guardar el registro de pagos', error);
+  }
+
+  renderPaymentLogs(paymentLogsListRef);
+}
+
+function renderPaymentLogs(container) {
+  if (!container) {
+    return;
+  }
+
+  const logs = loadPaymentLogs();
+
+  if (!logs.length) {
+    container.innerHTML = '<li class="history__empty">Aún no hay movimientos registrados.</li>';
+    return;
+  }
+
+  container.innerHTML = logs
+    .slice()
+    .reverse()
+    .map((entry) => `
+      <li>
+        <strong>${entry.admin}</strong><br>
+        ${entry.action}<br>
+        ${DATE_TIME_FORMATTER.format(new Date(entry.timestamp))}
+      </li>
+    `)
+    .join('');
+}
+
+function formatCurrencyValue(value) {
+  const numericValue = Number(value);
+
+  if (!Number.isFinite(numericValue)) {
+    return CURRENCY_FORMATTER.format(0);
+  }
+
+  return CURRENCY_FORMATTER.format(numericValue);
 }

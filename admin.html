@@ -73,6 +73,24 @@
           <p>Últimas operaciones realizadas por los administradores.</p>
           <ul class="history" id="adminLogs"></ul>
         </section>
+
+        <section class="card card--hidden" id="paymentsSection">
+          <div class="panel__sectionHeader">
+            <h3>Pagos</h3>
+            <button class="button button--secondary" type="button" id="paymentsToggle">Ver pedidos de la semana</button>
+          </div>
+          <p>Gestione los cobros de la semana laboral (lunes a viernes) y registre su estado.</p>
+          <div id="paymentsContent" hidden>
+            <p class="history__groupTitle" id="paymentsRangeLabel"></p>
+            <ul class="history history--payments" id="paymentsList"></ul>
+          </div>
+        </section>
+
+        <section class="card card--hidden" id="paymentLogsSection">
+          <h3>Registro de pagos</h3>
+          <p>Seguimiento exclusivo de los cobros marcados.</p>
+          <ul class="history" id="paymentLogs"></ul>
+        </section>
       </div>
     </section>
   </main>

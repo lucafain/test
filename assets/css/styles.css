@@ -337,6 +337,45 @@ a {
   line-height: 1.4;
 }
 
+.history--payments .history__item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.payment__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.payment__details {
+  margin: 0;
+}
+
+.payment__control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.payment__statusSelect {
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius);
+  border: 1px solid #d8dee4;
+  font-size: 0.95rem;
+  min-width: 150px;
+}
+
+.payment__meta {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
 .card--hidden {
   display: none;
 }
