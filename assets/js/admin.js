@@ -5,7 +5,8 @@ const STORAGE_KEYS = {
   currentAdmin: 'frigorifico_current_admin',
   adminLogs: 'frigorifico_admin_logs',
   payments: 'frigorifico_payment_status',
-  paymentLogs: 'frigorifico_payment_logs'
+  paymentLogs: 'frigorifico_payment_logs',
+  manualPaymentWeek: 'frigorifico_manual_payment_week'
 };
 
 const AUTHORIZED_ADMINS = [
@@ -122,6 +123,8 @@ document.addEventListener('DOMContentLoaded', () => {
   paymentsRangeLabelRef = document.getElementById('paymentsRangeLabel');
   paymentLogsListRef = document.getElementById('paymentLogs');
   const loginError = document.getElementById('loginError');
+
+  ensureManualPaymentWeekActive();
 
   let inventoryState = loadInventory();
 
@@ -696,7 +699,7 @@ function refreshPaymentsView() {
     return;
   }
 
-  const { start, end } = getWeekBoundaries(new Date());
+  const { start, end } = getActivePaymentsWeek(new Date());
   paymentsRangeLabelRef.textContent = formatWeekRange(start, end);
 
   const startTime = start.getTime();
@@ -794,6 +797,21 @@ function refreshPaymentsView() {
   paymentsListRef.innerHTML = listHtml;
 }
 
+function getActivePaymentsWeek(referenceDate) {
+  const manualWeek = loadManualPaymentWeek();
+
+  if (manualWeek) {
+    const start = new Date(manualWeek.start);
+    const end = new Date(manualWeek.end);
+
+    if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime()) && start <= end) {
+      return { start, end };
+    }
+  }
+
+  return getWeekBoundaries(referenceDate);
+}
+
 function getOrderIdentifier(order) {
   const timestamp = Number(order?.timestamp);
   if (Number.isFinite(timestamp) && timestamp > 0) {
@@ -816,6 +834,58 @@ function getWeekBoundaries(date) {
   end.setHours(23, 59, 59, 999);
 
   return { start, end };
+}
+
+function ensureManualPaymentWeekActive() {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  end.setHours(23, 59, 59, 999);
+
+  saveManualPaymentWeek(start.getTime(), end.getTime());
+}
+
+function loadManualPaymentWeek() {
+  const stored = localStorage.getItem(STORAGE_KEYS.manualPaymentWeek);
+  if (!stored) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(stored);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const start = Number(parsed.start);
+      const end = Number(parsed.end);
+
+      if (Number.isFinite(start) && Number.isFinite(end) && start <= end) {
+        return { start, end };
+      }
+    }
+  } catch (error) {
+    console.error('Error al leer la semana manual de pagos', error);
+  }
+
+  return null;
+}
+
+function saveManualPaymentWeek(startTime, endTime) {
+  const start = Number(startTime);
+  const end = Number(endTime);
+
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start > end) {
+    return;
+  }
+
+  try {
+    localStorage.setItem(
+      STORAGE_KEYS.manualPaymentWeek,
+      JSON.stringify({ start, end })
+    );
+  } catch (error) {
+    console.error('Error al guardar la semana manual de pagos', error);
+  }
 }
 
 function formatWeekRange(start, end) {
