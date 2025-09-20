@@ -5,6 +5,11 @@ const STORAGE_KEYS = {
   currentAdmin: 'frigorifico_current_admin'
 };
 
+const AUTHORIZED_ADMIN = {
+  username: 'martin',
+  password: '1234'
+};
+
 const CRATE_OPTIONS = [
   { id: 'X', label: 'Cajón X' },
   { id: '6', label: 'Cajón de 6 cabezas' },
@@ -29,6 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const saveInventoryButton = document.getElementById('saveInventory');
   const ordersHistory = document.getElementById('ordersHistory');
   const adminHistoryList = document.getElementById('adminHistory');
+  const loginError = document.getElementById('loginError');
 
   let inventoryState = loadInventory();
 
@@ -40,11 +46,26 @@ document.addEventListener('DOMContentLoaded', () => {
     event.preventDefault();
     const formData = new FormData(loginForm);
     const name = (formData.get('adminName') || '').toString().trim();
+    const password = (formData.get('adminPassword') || '').toString().trim();
 
     if (!name) {
       loginForm.adminName.focus();
       return;
     }
+
+    if (!password) {
+      loginForm.adminPassword.focus();
+      return;
+    }
+
+    if (!isAuthorized(name, password)) {
+      showLoginError(loginError, 'Usuario o contraseña incorrectos.');
+      loginForm.adminPassword.value = '';
+      loginForm.adminPassword.focus();
+      return;
+    }
+
+    hideLoginError(loginError);
 
     adminNameDisplay.textContent = name;
     loginSection.classList.add('card--hidden');
@@ -54,12 +75,16 @@ document.addEventListener('DOMContentLoaded', () => {
     persistAdminLogin(name);
     renderAdminHistory(adminHistoryList);
 
-    localStorage.setItem(STORAGE_KEYS.currentAdmin, name);
+    localStorage.setItem(
+      STORAGE_KEYS.currentAdmin,
+      JSON.stringify({ name })
+    );
   });
 
   logoutButton.addEventListener('click', () => {
     panelSection.classList.add('card--hidden');
     loginSection.classList.remove('card--hidden');
+    hideLoginError(loginError);
     localStorage.removeItem(STORAGE_KEYS.currentAdmin);
   });
 
@@ -99,13 +124,55 @@ document.addEventListener('DOMContentLoaded', () => {
     saveInventoryButton.disabled = false;
   });
 
-  const storedAdmin = localStorage.getItem(STORAGE_KEYS.currentAdmin);
-  if (storedAdmin) {
-    adminNameDisplay.textContent = storedAdmin;
+  const storedAdminRaw = localStorage.getItem(STORAGE_KEYS.currentAdmin);
+  const storedAdmin = parseStoredAdmin(storedAdminRaw);
+  if (storedAdmin && isAuthorized(storedAdmin.name, AUTHORIZED_ADMIN.password)) {
+    adminNameDisplay.textContent = storedAdmin.name;
     loginSection.classList.add('card--hidden');
     panelSection.classList.remove('card--hidden');
+  } else if (storedAdminRaw) {
+    localStorage.removeItem(STORAGE_KEYS.currentAdmin);
   }
 });
+
+function isAuthorized(name, password) {
+  const normalizedName = name.toLowerCase();
+  return (
+    normalizedName === AUTHORIZED_ADMIN.username &&
+    password === AUTHORIZED_ADMIN.password
+  );
+}
+
+function parseStoredAdmin(rawValue) {
+  if (!rawValue) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(rawValue);
+    if (parsed && typeof parsed.name === 'string') {
+      return parsed;
+    }
+  } catch (error) {
+    if (typeof rawValue === 'string') {
+      return { name: rawValue };
+    }
+  }
+
+  return null;
+}
+
+function showLoginError(container, message) {
+  if (!container) return;
+  container.textContent = message;
+  container.hidden = false;
+}
+
+function hideLoginError(container) {
+  if (!container) return;
+  container.textContent = '';
+  container.hidden = true;
+}
 
 function loadInventory() {
   const stored = localStorage.getItem(STORAGE_KEYS.inventory);
