@@ -68,6 +68,103 @@
           <p id="deliveryInfoMessage">Espere las indicaciones del administrador antes de registrar retiros o entregas.</p>
         </section>
       </div>
+
+      <section class="card deliveryReceipt" id="deliveryReceiptCard">
+        <h3>Comprobante de entrega</h3>
+        <p>Complete los datos para generar un comprobante imprimible y dejar constancia de la entrega.</p>
+
+        <form id="deliveryReceiptForm" class="form deliveryReceipt__form">
+          <label for="deliveryReceiptLocation">¿En qué local entregó?</label>
+          <input
+            id="deliveryReceiptLocation"
+            name="deliveryReceiptLocation"
+            type="text"
+            autocomplete="off"
+            required
+            placeholder="Ingrese el nombre del comercio"
+          >
+
+          <label for="deliveryReceiptItem">¿Qué entregó?</label>
+          <input
+            id="deliveryReceiptItem"
+            name="deliveryReceiptItem"
+            type="text"
+            autocomplete="off"
+            required
+            placeholder="Detalle del producto"
+          >
+
+          <label for="deliveryReceiptQuantity">Cantidad entregada</label>
+          <input
+            id="deliveryReceiptQuantity"
+            name="deliveryReceiptQuantity"
+            type="number"
+            min="1"
+            step="1"
+            required
+            placeholder="Ingrese la cantidad"
+          >
+
+          <label for="deliveryReceiptPerson">¿Quién recibió?</label>
+          <input
+            id="deliveryReceiptPerson"
+            name="deliveryReceiptPerson"
+            type="text"
+            autocomplete="off"
+            required
+            placeholder="Nombre y apellido"
+          >
+
+          <label for="deliveryReceiptSignature">Espacio para la firma</label>
+          <input
+            id="deliveryReceiptSignature"
+            name="deliveryReceiptSignature"
+            type="text"
+            autocomplete="off"
+            placeholder="Complete si desea dejar asentada la firma"
+          >
+
+          <div class="deliveryReceipt__actions">
+            <button class="button" type="submit">Generar comprobante</button>
+          </div>
+        </form>
+
+        <div class="deliveryReceipt__preview" id="deliveryReceiptPreview" hidden aria-live="polite">
+          <div class="deliveryReceipt__paper" id="deliveryPrintArea">
+            <header class="deliveryReceipt__paperHeader">
+              <h4>Frigorífico V2.4 &mdash; Registro de entrega</h4>
+              <p class="deliveryReceipt__timestamp">Emitido el <span id="deliveryReceiptTimestamp"></span></p>
+            </header>
+            <dl class="deliveryReceipt__details">
+              <div>
+                <dt>Local</dt>
+                <dd id="deliveryReceiptLocal"></dd>
+              </div>
+              <div>
+                <dt>Producto</dt>
+                <dd id="deliveryReceiptProduct"></dd>
+              </div>
+              <div>
+                <dt>Cantidad</dt>
+                <dd id="deliveryReceiptAmount"></dd>
+              </div>
+              <div>
+                <dt>Recibió</dt>
+                <dd id="deliveryReceiptPersonName"></dd>
+              </div>
+            </dl>
+            <div class="deliveryReceipt__signatureRow">
+              <span>Firma:</span>
+              <span class="deliveryReceipt__signatureLine" id="deliveryReceiptSignatureLine"></span>
+            </div>
+          </div>
+
+          <div class="deliveryReceipt__actions">
+            <button class="button button--secondary" type="button" id="deliveryReceiptEditButton">Editar datos</button>
+            <button class="button" type="button" id="deliveryReceiptPrintButton">Imprimir comprobante</button>
+          </div>
+        </div>
+      </section>
     </section>
   </main>
 

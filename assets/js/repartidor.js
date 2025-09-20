@@ -38,6 +38,23 @@ let addAccountFormRef = null;
 let addAccountMessageRef = null;
 let infoMessageRef = null;
 let addAccountMessageTimeout = null;
+let receiptCardRef = null;
+let receiptFormRef = null;
+let receiptPreviewRef = null;
+let receiptPrintButtonRef = null;
+let receiptEditButtonRef = null;
+let receiptLocationInputRef = null;
+let receiptItemInputRef = null;
+let receiptQuantityInputRef = null;
+let receiptPersonInputRef = null;
+let receiptSignatureInputRef = null;
+let receiptLocalDisplayRef = null;
+let receiptProductDisplayRef = null;
+let receiptAmountDisplayRef = null;
+let receiptPersonDisplayRef = null;
+let receiptSignatureLineRef = null;
+let receiptTimestampRef = null;
+let receiptDraft = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   const yearSpan = document.getElementById('year');
@@ -62,6 +79,22 @@ document.addEventListener('DOMContentLoaded', () => {
   addAccountFormRef = document.getElementById('addDeliveryForm');
   addAccountMessageRef = document.getElementById('addDeliveryMessage');
   infoMessageRef = document.getElementById('deliveryInfoMessage');
+  receiptCardRef = document.getElementById('deliveryReceiptCard');
+  receiptFormRef = document.getElementById('deliveryReceiptForm');
+  receiptPreviewRef = document.getElementById('deliveryReceiptPreview');
+  receiptPrintButtonRef = document.getElementById('deliveryReceiptPrintButton');
+  receiptEditButtonRef = document.getElementById('deliveryReceiptEditButton');
+  receiptLocationInputRef = document.getElementById('deliveryReceiptLocation');
+  receiptItemInputRef = document.getElementById('deliveryReceiptItem');
+  receiptQuantityInputRef = document.getElementById('deliveryReceiptQuantity');
+  receiptPersonInputRef = document.getElementById('deliveryReceiptPerson');
+  receiptSignatureInputRef = document.getElementById('deliveryReceiptSignature');
+  receiptLocalDisplayRef = document.getElementById('deliveryReceiptLocal');
+  receiptProductDisplayRef = document.getElementById('deliveryReceiptProduct');
+  receiptAmountDisplayRef = document.getElementById('deliveryReceiptAmount');
+  receiptPersonDisplayRef = document.getElementById('deliveryReceiptPersonName');
+  receiptSignatureLineRef = document.getElementById('deliveryReceiptSignatureLine');
+  receiptTimestampRef = document.getElementById('deliveryReceiptTimestamp');
 
   if (loginFormRef) {
     loginFormRef.addEventListener('submit', handleLoginSubmit);
@@ -78,6 +111,20 @@ document.addEventListener('DOMContentLoaded', () => {
   if (accountsListRef) {
     accountsListRef.addEventListener('click', handleAccountsListClick);
   }
+
+  if (receiptFormRef) {
+    receiptFormRef.addEventListener('submit', handleReceiptSubmit);
+  }
+
+  if (receiptEditButtonRef) {
+    receiptEditButtonRef.addEventListener('click', handleReceiptEditClick);
+  }
+
+  if (receiptPrintButtonRef) {
+    receiptPrintButtonRef.addEventListener('click', handleReceiptPrintClick);
+  }
+
+  resetReceiptSection();
 });
 
 function handleLoginSubmit(event) {
@@ -170,6 +217,7 @@ function enterDeliveryPortal(account) {
   }
 
   updateManagementVisibility();
+  resetReceiptSection();
 }
 
 function updateManagementVisibility() {
@@ -233,6 +281,191 @@ function handleLogout() {
 
   clearLoginError();
   clearAddAccountMessage();
+  resetReceiptSection();
+}
+
+function handleReceiptSubmit(event) {
+  event.preventDefault();
+
+  if (!receiptFormRef) {
+    return;
+  }
+
+  if (typeof receiptFormRef.reportValidity === 'function' && !receiptFormRef.reportValidity()) {
+    return;
+  }
+
+  const formData = new FormData(receiptFormRef);
+  const location = (formData.get('deliveryReceiptLocation') ?? '').toString().trim();
+  const product = (formData.get('deliveryReceiptItem') ?? '').toString().trim();
+  const quantityValue = (formData.get('deliveryReceiptQuantity') ?? '').toString();
+  const person = (formData.get('deliveryReceiptPerson') ?? '').toString().trim();
+  const signature = (formData.get('deliveryReceiptSignature') ?? '').toString().trim();
+
+  if (!location || !product || !quantityValue || !person) {
+    return;
+  }
+
+  const quantity = Number.parseInt(quantityValue, 10);
+  const normalizedQuantity = Number.isFinite(quantity) ? quantity : quantityValue;
+
+  receiptDraft = {
+    location,
+    product,
+    quantity: normalizedQuantity,
+    person,
+    signature
+  };
+
+  renderReceiptPreview();
+  showReceiptPreview();
+}
+
+function renderReceiptPreview() {
+  if (!receiptDraft) {
+    return;
+  }
+
+  if (receiptLocalDisplayRef) {
+    receiptLocalDisplayRef.textContent = receiptDraft.location;
+  }
+
+  if (receiptProductDisplayRef) {
+    receiptProductDisplayRef.textContent = receiptDraft.product;
+  }
+
+  if (receiptAmountDisplayRef) {
+    receiptAmountDisplayRef.textContent = `${receiptDraft.quantity}`;
+  }
+
+  if (receiptPersonDisplayRef) {
+    receiptPersonDisplayRef.textContent = receiptDraft.person;
+  }
+
+  if (receiptSignatureLineRef) {
+    receiptSignatureLineRef.textContent = receiptDraft.signature ?? '';
+  }
+
+  if (receiptTimestampRef) {
+    receiptTimestampRef.textContent = DATE_TIME_FORMATTER.format(new Date());
+  }
+}
+
+function showReceiptPreview() {
+  if (receiptFormRef) {
+    receiptFormRef.hidden = true;
+  }
+
+  if (receiptPreviewRef) {
+    receiptPreviewRef.hidden = false;
+
+    if (receiptCardRef) {
+      activateCard(receiptCardRef);
+    }
+
+    if (typeof receiptPreviewRef.scrollIntoView === 'function') {
+      const behavior = shouldReduceMotion() ? 'auto' : 'smooth';
+      receiptPreviewRef.scrollIntoView({ block: 'start', behavior });
+    }
+  }
+}
+
+function showReceiptForm() {
+  if (receiptPreviewRef) {
+    receiptPreviewRef.hidden = true;
+  }
+
+  if (receiptFormRef) {
+    receiptFormRef.hidden = false;
+  }
+}
+
+function handleReceiptEditClick() {
+  if (!receiptDraft) {
+    showReceiptForm();
+    return;
+  }
+
+  if (receiptLocationInputRef) {
+    receiptLocationInputRef.value = receiptDraft.location;
+  }
+
+  if (receiptItemInputRef) {
+    receiptItemInputRef.value = receiptDraft.product;
+  }
+
+  if (receiptQuantityInputRef) {
+    receiptQuantityInputRef.value = receiptDraft.quantity;
+  }
+
+  if (receiptPersonInputRef) {
+    receiptPersonInputRef.value = receiptDraft.person;
+  }
+
+  if (receiptSignatureInputRef) {
+    receiptSignatureInputRef.value = receiptDraft.signature ?? '';
+  }
+
+  showReceiptForm();
+
+  if (receiptLocationInputRef && typeof receiptLocationInputRef.focus === 'function') {
+    receiptLocationInputRef.focus();
+  }
+}
+
+function handleReceiptPrintClick() {
+  if (!receiptDraft) {
+    return;
+  }
+
+  if (typeof window.print === 'function') {
+    window.print();
+  }
+}
+
+function resetReceiptSection() {
+  receiptDraft = null;
+
+  if (receiptFormRef) {
+    receiptFormRef.reset();
+    receiptFormRef.hidden = false;
+  }
+
+  if (receiptPreviewRef) {
+    receiptPreviewRef.hidden = true;
+  }
+
+  if (receiptSignatureLineRef) {
+    receiptSignatureLineRef.textContent = '';
+  }
+
+  if (receiptTimestampRef) {
+    receiptTimestampRef.textContent = '';
+  }
+
+  if (receiptLocalDisplayRef) {
+    receiptLocalDisplayRef.textContent = '';
+  }
+
+  if (receiptProductDisplayRef) {
+    receiptProductDisplayRef.textContent = '';
+  }
+
+  if (receiptAmountDisplayRef) {
+    receiptAmountDisplayRef.textContent = '';
+  }
+
+  if (receiptPersonDisplayRef) {
+    receiptPersonDisplayRef.textContent = '';
+  }
+
+  if (receiptSignatureInputRef) {
+    receiptSignatureInputRef.value = '';
+  }
+
+  if (receiptCardRef) {
+    receiptCardRef.scrollTop = 0;
+  }
 }
 
 function handleAddDeliveryAccount(event) {
