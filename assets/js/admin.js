@@ -8,7 +8,8 @@ const STORAGE_KEYS = {
 
 const AUTHORIZED_ADMINS = [
   { username: 'martin', password: '1234', displayName: 'Martin' },
-  { username: 'luca', password: 'Luca-admin', displayName: 'Luca' }
+  { username: 'luca', password: 'Luca-admin', displayName: 'Luca' },
+  { username: 'franco', password: '1234', displayName: 'Franco' }
 ];
 
 const WEEK_RANGE_FORMATTER = new Intl.DateTimeFormat('es-AR', {
@@ -162,6 +163,39 @@ document.addEventListener('DOMContentLoaded', () => {
       };
     });
 
+    const previousInventoryMap = new Map(
+      (inventoryState ?? []).map((item) => [item.id, item])
+    );
+
+    const changeDescriptions = [];
+
+    updatedInventory.forEach((item) => {
+      const previous = previousInventoryMap.get(item.id);
+      const stockChanged = previous?.stock !== item.stock;
+      const priceChanged = previous?.price !== item.price;
+
+      if (!stockChanged && !priceChanged) {
+        return;
+      }
+
+      const fragments = [];
+      if (stockChanged) {
+        const previousStock = Number.isFinite(previous?.stock)
+          ? previous.stock
+          : 0;
+        fragments.push(`stock ${previousStock} → ${item.stock}`);
+      }
+
+      if (priceChanged) {
+        const previousPrice = Number.isFinite(previous?.price)
+          ? previous.price
+          : 0;
+        fragments.push(`precio ${previousPrice} → ${item.price}`);
+      }
+
+      changeDescriptions.push(`${item.label}: ${fragments.join(', ')}`);
+    });
+
     inventoryState = updatedInventory;
     localStorage.setItem(STORAGE_KEYS.inventory, JSON.stringify(updatedInventory));
 
@@ -169,7 +203,14 @@ document.addEventListener('DOMContentLoaded', () => {
     saveInventoryButton.disabled = true;
     const activeAdminName = getActiveAdminDisplayName();
     if (activeAdminName) {
-      appendAdminLog('Actualizó el inventario', activeAdminName);
+      if (changeDescriptions.length) {
+        appendAdminLog(
+          `Actualizó el inventario (${changeDescriptions.join(' | ')})`,
+          activeAdminName
+        );
+      } else {
+        appendAdminLog('Guardó el inventario sin cambios', activeAdminName);
+      }
     }
     setTimeout(() => {
       saveInventoryButton.textContent = 'Guardar cambios';
