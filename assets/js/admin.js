@@ -685,15 +685,30 @@ function refreshPaymentsView() {
 
   const paymentStates = loadPaymentStates();
 
-  const listHtml = orders
-    .map((order) => {
-      const orderId = getOrderIdentifier(order);
-      if (!orderId) {
-        return '';
-      }
+  const pendingOrders = [];
 
-      paymentOrdersCache.set(orderId, order);
+  orders.forEach((order) => {
+    const orderId = getOrderIdentifier(order);
+    if (!orderId) {
+      return;
+    }
 
+    const stateRecord = paymentStates[orderId];
+    if (stateRecord?.status === 'paid') {
+      return;
+    }
+
+    pendingOrders.push({ order, orderId, stateRecord });
+    paymentOrdersCache.set(orderId, order);
+  });
+
+  if (!pendingOrders.length) {
+    paymentsListRef.innerHTML = '<li class="history__empty">No hay pedidos pendientes de cobro en la semana actual.</li>';
+    return;
+  }
+
+  const listHtml = pendingOrders
+    .map(({ order, orderId, stateRecord }) => {
       const timestamp = Number(order.timestamp);
       const timestampLabel = Number.isFinite(timestamp)
         ? DATE_TIME_FORMATTER.format(new Date(timestamp))
@@ -710,9 +725,8 @@ function refreshPaymentsView() {
         ? `<div class="payment__meta">Total estimado: ${formatCurrencyValue(totalValue)}</div>`
         : '';
 
-      const stateRecord = paymentStates[orderId] ?? {};
-      const statusValue = stateRecord.status === 'paid' ? 'paid' : 'pending';
-      const updatedMeta = stateRecord.updatedAt
+      const statusValue = stateRecord?.status === 'paid' ? 'paid' : 'pending';
+      const updatedMeta = stateRecord?.updatedAt
         ? `Actualizado por ${stateRecord.admin ?? 'Administrador'} el ${DATE_TIME_FORMATTER.format(new Date(stateRecord.updatedAt))}`
         : 'Sin registro de cobro.';
 
@@ -736,7 +750,6 @@ function refreshPaymentsView() {
         </li>
       `;
     })
-    .filter(Boolean)
     .join('');
 
   paymentsListRef.innerHTML = listHtml;
@@ -967,11 +980,10 @@ function updatePaymentState(orderId, status, adminName, order) {
     ? ` (total estimado ${formatCurrencyValue(totalValue)})`
     : '';
 
-  const action = sanitizedStatus === 'paid'
-    ? `Marcó como cobrado el pedido de ${storeName} (${quantityLabel})${totalFragment}`
-    : `Marcó como pendiente el pedido de ${storeName} (${quantityLabel})${totalFragment}`;
-
-  appendPaymentLog(action, safeAdminName);
+  if (sanitizedStatus === 'paid') {
+    const action = `Marcó como cobrado el pedido de ${storeName} (${quantityLabel})${totalFragment}`;
+    appendPaymentLog(action, safeAdminName);
+  }
   return true;
 }
 
