@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enviar pedido - Frigorífico Kosher</title>
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+  <header class="subheader">
+    <a class="subheader__back" href="index.html">&larr; Inicio</a>
+    <h1>Solicitud de pedido mayorista</h1>
+  </header>
+
+  <main class="container">
+    <section class="card" id="orderSection">
+      <h2>Complete los datos de su comercio</h2>
+      <form id="orderForm" class="form">
+        <label for="storeName">Nombre del local</label>
+        <input id="storeName" name="storeName" type="text" required placeholder="Ej: Carnicería Kosher Central">
+
+        <label for="storeAddress">Dirección completa</label>
+        <input id="storeAddress" name="storeAddress" type="text" required placeholder="Ej: Av. Ejemplo 1234, CABA">
+
+        <label for="crateQuantity">Cantidad de cajones</label>
+        <input
+          id="crateQuantity"
+          name="crateQuantity"
+          type="number"
+          min="1"
+          step="1"
+          required
+          placeholder="Ej: 3"
+        >
+
+        <fieldset class="form__fieldset">
+          <legend>¿Qué cajón necesita?</legend>
+          <label class="radio">
+            <input type="radio" name="crateSize" value="Cajón X" required>
+            Cajón X
+          </label>
+          <label class="radio">
+            <input type="radio" name="crateSize" value="6 cabezas" required>
+            Cajón de 6 cabezas
+          </label>
+          <label class="radio">
+            <input type="radio" name="crateSize" value="7 cabezas">
+            Cajón de 7 cabezas
+          </label>
+          <label class="radio">
+            <input type="radio" name="crateSize" value="8 cabezas">
+            Cajón de 8 cabezas
+          </label>
+          <label class="radio">
+            <input type="radio" name="crateSize" value="9 cabezas">
+            Cajón de 9 cabezas
+          </label>
+          <label class="radio">
+            <input type="radio" name="crateSize" value="10 cabezas">
+            Cajón de 10 cabezas
+          </label>
+        </fieldset>
+
+        <button class="button" type="submit">Enviar pedido</button>
+      </form>
+    </section>
+
+    <section class="card card--hidden" id="confirmation">
+      <h2>¡Gracias por su pedido!</h2>
+      <p>Hemos registrado su solicitud. Un representante se comunicará para confirmar la disponibilidad.</p>
+      <div class="confirmation__details" id="confirmationDetails"></div>
+      <button class="button button--secondary" id="newOrder">Cargar otro pedido</button>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>&copy; <span id="year"></span> Frigorífico Kosher. Ventas mayoristas.</p>
+  </footer>
+
+  <script src="assets/js/pedido.js"></script>
+</body>
+</html>
