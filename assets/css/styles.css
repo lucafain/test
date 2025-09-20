@@ -16,9 +16,10 @@
 body {
   margin: 0;
   font-family: "Inter", "Segoe UI", sans-serif;
-  background: var(--background);
+  background: linear-gradient(180deg, #fdfdfd 0%, #eef5f8 45%, #f7f0eb 100%);
   color: var(--text);
   line-height: 1.6;
+  min-height: 100vh;
 }
 
 a {
@@ -103,11 +104,33 @@ a {
 }
 
 .card {
-  background: #fff;
+  position: relative;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.95), rgba(241, 248, 251, 0.95));
   padding: 2rem;
   margin-bottom: 2rem;
   border-radius: var(--radius);
   box-shadow: var(--shadow);
+  overflow: hidden;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at top right, rgba(242, 161, 84, 0.15), transparent 55%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 18px 40px rgba(31, 111, 139, 0.2);
+}
+
+.card:hover::after {
+  opacity: 1;
 }
 
 .card--highlight {
@@ -304,9 +327,19 @@ a {
 }
 
 .history > li {
-  padding: 1rem;
+  position: relative;
+  padding: 1rem 1.25rem 1rem 1.75rem;
   border-radius: var(--radius);
   background: rgba(31, 111, 139, 0.08);
+  overflow: hidden;
+}
+
+.history > li::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0.45rem;
+  background: linear-gradient(180deg, var(--primary), rgba(242, 161, 84, 0.85));
 }
 
 .history__groupTitle {
@@ -324,23 +357,58 @@ a {
 }
 
 .history__item {
-  padding: 0.75rem 1rem;
+  position: relative;
+  padding: 0.75rem 1rem 0.75rem 1.6rem;
   border-radius: var(--radius);
   background: rgba(31, 111, 139, 0.12);
   line-height: 1.4;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.history__item::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0.35rem;
+  background: linear-gradient(180deg, rgba(242, 161, 84, 0.9), rgba(31, 111, 139, 0.9));
+  opacity: 0.85;
+}
+
+.history__item:hover {
+  transform: translateX(4px);
+  box-shadow: 0 12px 24px rgba(31, 111, 139, 0.18);
 }
 
 .history__empty {
-  padding: 0.75rem 1rem;
+  position: relative;
+  padding: 0.75rem 1rem 0.75rem 1.6rem;
   border-radius: var(--radius);
   background: rgba(31, 111, 139, 0.08);
   line-height: 1.4;
+  overflow: hidden;
+}
+
+.history__empty::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0.35rem;
+  background: linear-gradient(180deg, rgba(153, 168, 178, 0.7), rgba(31, 111, 139, 0.4));
 }
 
 .history--payments .history__item {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+}
+
+.history--payments .history__item::before {
+  background: linear-gradient(180deg, rgba(31, 111, 139, 0.95), rgba(116, 198, 157, 0.9));
+}
+
+.history--payments .history__item:hover {
+  box-shadow: 0 12px 26px rgba(31, 111, 139, 0.25);
 }
 
 .payment__header {
