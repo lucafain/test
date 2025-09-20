@@ -88,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (paymentsToggleButtonRef) {
     paymentsToggleButtonRef.addEventListener('click', () => {
-      if (!isAdminLuca(currentAdminRecord)) {
+      if (!isPaymentsAdmin(currentAdminRecord)) {
         return;
       }
 
@@ -552,7 +552,7 @@ function renderOrdersHistory(container) {
 
   container.innerHTML = groupHtml;
 
-  if (paymentsVisible && isAdminLuca(currentAdminRecord)) {
+  if (paymentsVisible && isPaymentsAdmin(currentAdminRecord)) {
     refreshPaymentsView();
   }
 
@@ -560,10 +560,10 @@ function renderOrdersHistory(container) {
 }
 
 function updateAdminPermissions(adminRecord) {
-  const isLucaActive = isAdminLuca(adminRecord);
+  const isPaymentsAdminActive = isPaymentsAdmin(adminRecord);
 
   if (paymentsSectionRef) {
-    if (isLucaActive) {
+    if (isPaymentsAdminActive) {
       paymentsSectionRef.classList.remove('card--hidden');
       if (paymentsToggleButtonRef) {
         paymentsToggleButtonRef.disabled = false;
@@ -592,7 +592,7 @@ function updateAdminPermissions(adminRecord) {
   }
 
   if (paymentLogsSectionRef) {
-    if (isLucaActive) {
+    if (isPaymentsAdminActive) {
       paymentLogsSectionRef.classList.remove('card--hidden');
       renderPaymentLogs(paymentLogsListRef);
     } else {
@@ -604,7 +604,7 @@ function updateAdminPermissions(adminRecord) {
   }
 }
 
-function isAdminLuca(adminRecord) {
+function isPaymentsAdmin(adminRecord) {
   if (!adminRecord) {
     return false;
   }
@@ -616,7 +616,7 @@ function isAdminLuca(adminRecord) {
       ?? ''
   ).toString().toLowerCase();
 
-  return username === 'luca';
+  return username === 'luca' || username === 'martin';
 }
 
 function handlePaymentStatusChange(event) {
@@ -625,7 +625,7 @@ function handlePaymentStatusChange(event) {
     return;
   }
 
-  if (!isAdminLuca(currentAdminRecord)) {
+  if (!isPaymentsAdmin(currentAdminRecord)) {
     return;
   }
 
@@ -653,7 +653,7 @@ function refreshPaymentsView() {
     return;
   }
 
-  if (!isAdminLuca(currentAdminRecord)) {
+  if (!isPaymentsAdmin(currentAdminRecord)) {
     return;
   }
 
@@ -775,11 +775,6 @@ function getWeekBoundaries(date) {
   const end = new Date(start);
   end.setDate(end.getDate() + 4);
   end.setHours(23, 59, 59, 999);
-
-  const yearEnd = new Date(start.getFullYear(), 11, 31, 23, 59, 59, 999);
-  if (end > yearEnd) {
-    end.setTime(yearEnd.getTime());
-  }
 
   return { start, end };
 }
