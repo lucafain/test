@@ -9,10 +9,55 @@ const STORAGE_KEYS = {
 };
 
 const AUTHORIZED_ADMINS = [
-  { username: 'martin', password: '1234', displayName: 'Martin' },
-  { username: 'luca', password: 'Luca-admin', displayName: 'Luca' },
-  { username: 'franco', password: '1234', displayName: 'Franco' }
+  {
+    username: 'martin',
+    password: '1234',
+    displayName: 'Martin',
+    permissions: { managePayments: true, clearOrders: true }
+  },
+  {
+    username: 'luca',
+    password: 'Luca-admin',
+    displayName: 'Luca',
+    permissions: { managePayments: true, clearOrders: true }
+  },
+  {
+    username: 'franco',
+    password: '1234',
+    displayName: 'Franco',
+    permissions: {}
+  }
 ];
+
+function normalizeAdminIdentifier(value) {
+  if (!value) {
+    return '';
+  }
+
+  return value
+    .toString()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+}
+
+function findAuthorizedAdminByIdentifier(identifier) {
+  if (!identifier) {
+    return null;
+  }
+
+  const normalized = normalizeAdminIdentifier(identifier);
+  if (!normalized) {
+    return null;
+  }
+
+  return (
+    AUTHORIZED_ADMINS.find(
+      (admin) => normalizeAdminIdentifier(admin.username) === normalized
+    ) ?? null
+  );
+}
 
 const WEEK_RANGE_FORMATTER = new Intl.DateTimeFormat('es-AR', {
   day: 'numeric',
@@ -298,27 +343,32 @@ function getAuthorizedAdmin(name) {
     return null;
   }
 
-  const normalizedName = name.toString().toLowerCase();
-  return (
-    AUTHORIZED_ADMINS.find(
-      (admin) => admin.username.toLowerCase() === normalizedName
-    ) ?? null
-  );
+  return findAuthorizedAdminByIdentifier(name);
 }
 
-function isHistoryClearAllowed(adminRecord) {
-  if (!adminRecord) {
+function hasAdminPermission(adminRecord, permissionKey) {
+  if (!adminRecord || !permissionKey) {
     return false;
   }
 
-  const username = (
+  const identifier = (
     adminRecord.username
       ?? adminRecord.displayName
       ?? adminRecord.name
       ?? ''
-  ).toString().toLowerCase();
+  );
 
-  return username === 'martin' || username === 'luca';
+  const matchedAdmin = findAuthorizedAdminByIdentifier(identifier);
+  if (!matchedAdmin) {
+    return false;
+  }
+
+  const permissions = matchedAdmin.permissions ?? {};
+  return Boolean(permissions[permissionKey]);
+}
+
+function isHistoryClearAllowed(adminRecord) {
+  return hasAdminPermission(adminRecord, 'clearOrders');
 }
 
 function parseStoredAdmin(rawValue) {
@@ -605,18 +655,7 @@ function updateAdminPermissions(adminRecord) {
 }
 
 function isPaymentsAdmin(adminRecord) {
-  if (!adminRecord) {
-    return false;
-  }
-
-  const username = (
-    adminRecord.username
-      ?? adminRecord.displayName
-      ?? adminRecord.name
-      ?? ''
-  ).toString().toLowerCase();
-
-  return username === 'luca' || username === 'martin';
+  return hasAdminPermission(adminRecord, 'managePayments');
 }
 
 function handlePaymentStatusChange(event) {
