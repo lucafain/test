@@ -6,9 +6,9 @@
   <title>Panel de administración - Frigorífico Kosher</title>
   <link rel="stylesheet" href="assets/css/styles.css">
 </head>
-<body>
+<body class="page page--transition">
   <header class="subheader">
-    <a class="subheader__back" href="index.html">&larr; Inicio</a>
+    <a class="subheader__back" href="index.html" data-transition>&larr; Inicio</a>
     <h1>Panel de administración</h1>
   </header>
 
@@ -24,6 +24,14 @@
         <p class="form__message form__message--error" id="loginError" hidden aria-live="polite"></p>
         <button class="button" type="submit">Ingresar</button>
       </form>
+    </section>
+
+    <section class="card card--hidden" id="adminProcessingSection" aria-live="polite">
+      <h2>Validando acceso</h2>
+      <p>Preparando la información más reciente del panel...</p>
+      <div class="progress">
+        <div class="progress__bar" id="adminProcessingBar"></div>
+      </div>
     </section>
 
     <section class="card card--hidden" id="panelSection">

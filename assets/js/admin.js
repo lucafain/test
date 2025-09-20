@@ -104,6 +104,9 @@ document.addEventListener('DOMContentLoaded', () => {
     yearSpan.textContent = new Date().getFullYear();
   }
 
+  activatePage();
+  setupLinkTransitions();
+
   const loginSection = document.getElementById('loginSection');
   const panelSection = document.getElementById('panelSection');
   const loginForm = document.getElementById('loginForm');
@@ -123,6 +126,8 @@ document.addEventListener('DOMContentLoaded', () => {
   paymentsRangeLabelRef = document.getElementById('paymentsRangeLabel');
   paymentLogsListRef = document.getElementById('paymentLogs');
   const loginError = document.getElementById('loginError');
+  const processingSection = document.getElementById('adminProcessingSection');
+  const processingBar = document.getElementById('adminProcessingBar');
 
   ensureManualPaymentWeekActive();
 
@@ -208,13 +213,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     currentAdminRecord = adminRecord;
     adminNameDisplay.textContent = adminDisplayName;
-    loginSection.classList.add('card--hidden');
-    panelSection.classList.remove('card--hidden');
-    loginForm.reset();
-
     persistAdminLogin(adminDisplayName);
     renderAdminHistory(adminHistoryList);
-    updateClearOrdersButton(loadOrders().length > 0);
     appendAdminLog('Inició sesión', adminDisplayName);
     updateAdminPermissions(currentAdminRecord);
 
@@ -225,6 +225,16 @@ document.addEventListener('DOMContentLoaded', () => {
         name: adminDisplayName
       })
     );
+
+    loginForm.reset();
+    loginSection.classList.add('card--hidden');
+    panelSection.classList.add('card--hidden');
+
+    startProcessingTransition(processingSection, processingBar, () => {
+      panelSection.classList.remove('card--hidden');
+      activateCard(panelSection);
+      updateClearOrdersButton(loadOrders().length > 0);
+    });
   });
 
   logoutButton.addEventListener('click', () => {
@@ -234,6 +244,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     panelSection.classList.add('card--hidden');
     loginSection.classList.remove('card--hidden');
+    activateCard(loginSection);
+    if (processingSection) {
+      processingSection.classList.add('card--hidden');
+    }
     hideLoginError(loginError);
     currentAdminRecord = null;
     updateClearOrdersButton(false);
@@ -336,8 +350,12 @@ document.addEventListener('DOMContentLoaded', () => {
     panelSection.classList.remove('card--hidden');
     updateClearOrdersButton(loadOrders().length > 0);
     updateAdminPermissions(currentAdminRecord);
+    activateCard(panelSection);
   } else if (storedAdminRaw) {
     localStorage.removeItem(STORAGE_KEYS.currentAdmin);
+    activateCard(loginSection);
+  } else {
+    activateCard(loginSection);
   }
 });
 
@@ -1165,4 +1183,130 @@ function formatCurrencyValue(value) {
   }
 
   return CURRENCY_FORMATTER.format(numericValue);
+}
+
+function activatePage() {
+  if (document.body && document.body.classList.contains('page--transition')) {
+    requestAnimationFrame(() => {
+      document.body.classList.add('page--ready');
+      document.body.classList.remove('page--exit');
+    });
+  }
+}
+
+function setupLinkTransitions() {
+  const links = document.querySelectorAll('a[data-transition]');
+  links.forEach((link) => {
+    link.addEventListener('click', (event) => {
+      const href = link.getAttribute('href');
+      if (!href || href.startsWith('#') || link.target === '_blank') {
+        return;
+      }
+
+      event.preventDefault();
+      triggerPageExit(() => {
+        window.location.href = href;
+      });
+    });
+  });
+}
+
+function triggerPageExit(callback) {
+  if (!document.body) {
+    callback();
+    return;
+  }
+
+  document.body.classList.add('page--exit');
+
+  if (shouldReduceMotion()) {
+    callback();
+    return;
+  }
+
+  setTimeout(callback, 350);
+}
+
+function activateCard(cardElement) {
+  if (!cardElement) {
+    return;
+  }
+
+  cardElement.classList.remove('card--active');
+  void cardElement.offsetWidth;
+  cardElement.classList.add('card--active');
+
+  const cleanupDelay = shouldReduceMotion() ? 0 : 500;
+  setTimeout(() => {
+    cardElement.classList.remove('card--active');
+  }, cleanupDelay);
+}
+
+function startProcessingTransition(section, bar, callback) {
+  if (!section) {
+    callback();
+    return;
+  }
+
+  section.classList.remove('card--hidden');
+  activateCard(section);
+
+  if (bar) {
+    resetProgressBar(bar);
+  }
+
+  const duration = shouldReduceMotion() ? 0 : 4000;
+
+  if (bar) {
+    animateProgressBar(bar, duration);
+  }
+
+  if (duration === 0) {
+    section.classList.add('card--hidden');
+    if (bar) {
+      resetProgressBar(bar);
+    }
+    callback();
+    return;
+  }
+
+  setTimeout(() => {
+    section.classList.add('card--hidden');
+    if (bar) {
+      resetProgressBar(bar);
+    }
+    callback();
+  }, duration);
+}
+
+function animateProgressBar(bar, duration) {
+  if (!bar) {
+    return;
+  }
+
+  bar.classList.remove('progress__bar--animate');
+  bar.style.transitionDuration = `${duration}ms`;
+  bar.style.width = '0%';
+  void bar.offsetWidth;
+
+  if (duration === 0) {
+    bar.style.width = '100%';
+    return;
+  }
+
+  bar.classList.add('progress__bar--animate');
+}
+
+function resetProgressBar(bar) {
+  if (!bar) {
+    return;
+  }
+
+  bar.classList.remove('progress__bar--animate');
+  bar.style.transitionDuration = '';
+  bar.style.width = '0%';
+}
+
+function shouldReduceMotion() {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }

@@ -17,6 +17,9 @@ document.addEventListener('DOMContentLoaded', () => {
     yearSpan.textContent = new Date().getFullYear();
   }
 
+  activatePage();
+  setupLinkTransitions();
+
   const orderSection = document.getElementById('orderSection');
   const orderForm = document.getElementById('orderForm');
   const confirmationSection = document.getElementById('confirmation');
@@ -29,6 +32,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const orderMessage = document.getElementById('orderMessage');
   const submitButton = orderForm.querySelector('button[type="submit"]');
   const globalAlert = document.getElementById('globalAlert');
+  const processingSection = document.getElementById('processingSection');
+  const processingBar = document.getElementById('processingBar');
 
   let inventory = normalizeInventory(loadInventory());
   let pendingOrderContext = null;
@@ -41,6 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   renderCrateOptions(crateOptionsContainer, inventory, submitButton, orderMessage, globalAlert);
+  activateCard(orderSection);
 
   orderForm.addEventListener('input', () => {
     hideMessage(orderMessage);
@@ -54,6 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
       reviewSection.classList.add('card--hidden');
       confirmationSection.classList.add('card--hidden');
       orderSection.classList.remove('card--hidden');
+      activateCard(orderSection);
 
       if (pendingOrderContext) {
         restoreOrderFormValues(orderForm, pendingOrderContext.order);
@@ -86,25 +93,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const refreshedCrateData = inventory.find((item) => item.id === order.crateId) ?? crateData ?? null;
 
-      renderConfirmation(confirmationDetails, orderToPersist, refreshedCrateData);
-
       pendingOrderContext = null;
 
       reviewSection.classList.add('card--hidden');
       orderSection.classList.add('card--hidden');
-      confirmationSection.classList.remove('card--hidden');
+      confirmationSection.classList.add('card--hidden');
 
-      orderForm.reset();
-      hideMessage(orderMessage);
-      hideAlert(globalAlert);
-      renderCrateOptions(
-        crateOptionsContainer,
-        inventory,
-        submitButton,
-        orderMessage,
-        globalAlert,
-        { preserveAlerts: true, preserveMessage: true }
-      );
+      startProcessingTransition(processingSection, processingBar, () => {
+        renderConfirmation(confirmationDetails, orderToPersist, refreshedCrateData);
+        confirmationSection.classList.remove('card--hidden');
+        activateCard(confirmationSection);
+
+        orderForm.reset();
+        hideMessage(orderMessage);
+        hideAlert(globalAlert);
+        renderCrateOptions(
+          crateOptionsContainer,
+          inventory,
+          submitButton,
+          orderMessage,
+          globalAlert,
+          { preserveAlerts: true, preserveMessage: true }
+        );
+      });
     });
   }
 
@@ -225,6 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
     orderSection.classList.add('card--hidden');
     confirmationSection.classList.add('card--hidden');
     reviewSection.classList.remove('card--hidden');
+    activateCard(reviewSection);
   });
 });
 
@@ -517,6 +529,8 @@ function showLockedConfirmation(orderSection, confirmationSection, confirmationD
   } else if (confirmationDetails) {
     confirmationDetails.innerHTML = '<p>No hay detalles para mostrar en este momento.</p>';
   }
+
+  activateCard(confirmationSection);
 }
 
 function calculateNextMondayTimestamp(referenceTimestamp) {
@@ -543,4 +557,135 @@ function calculateNextMondayTimestamp(referenceTimestamp) {
   nextMonday.setDate(weekStart.getDate() + 7);
 
   return nextMonday.getTime();
+}
+
+function activatePage() {
+  if (document.body && document.body.classList.contains('page--transition')) {
+    requestAnimationFrame(() => {
+      document.body.classList.add('page--ready');
+      document.body.classList.remove('page--exit');
+    });
+  }
+}
+
+function setupLinkTransitions() {
+  const links = document.querySelectorAll('a[data-transition]');
+  links.forEach((link) => {
+    link.addEventListener('click', (event) => {
+      const href = link.getAttribute('href');
+      if (!href || href.startsWith('#') || link.target === '_blank') {
+        return;
+      }
+
+      event.preventDefault();
+      triggerPageExit(() => {
+        window.location.href = href;
+      });
+    });
+  });
+}
+
+function triggerPageExit(callback) {
+  if (!document.body) {
+    callback();
+    return;
+  }
+
+  document.body.classList.add('page--exit');
+
+  if (shouldReduceMotion()) {
+    callback();
+    return;
+  }
+
+  setTimeout(callback, 350);
+}
+
+function activateCard(cardElement) {
+  if (!cardElement) {
+    return;
+  }
+
+  cardElement.classList.remove('card--active');
+  void cardElement.offsetWidth;
+  cardElement.classList.add('card--active');
+
+  if (shouldReduceMotion()) {
+    setTimeout(() => {
+      cardElement.classList.remove('card--active');
+    }, 0);
+  } else {
+    setTimeout(() => {
+      cardElement.classList.remove('card--active');
+    }, 500);
+  }
+}
+
+function startProcessingTransition(section, bar, callback) {
+  if (!section) {
+    callback();
+    return;
+  }
+
+  section.classList.remove('card--hidden');
+  activateCard(section);
+
+  if (bar) {
+    resetProgressBar(bar);
+  }
+
+  const duration = shouldReduceMotion() ? 0 : 4000;
+
+  if (bar) {
+    animateProgressBar(bar, duration);
+  }
+
+  if (duration === 0) {
+    section.classList.add('card--hidden');
+    if (bar) {
+      resetProgressBar(bar);
+    }
+    callback();
+    return;
+  }
+
+  setTimeout(() => {
+    section.classList.add('card--hidden');
+    if (bar) {
+      resetProgressBar(bar);
+    }
+    callback();
+  }, duration);
+}
+
+function animateProgressBar(bar, duration) {
+  if (!bar) {
+    return;
+  }
+
+  bar.classList.remove('progress__bar--animate');
+  bar.style.transitionDuration = `${duration}ms`;
+  bar.style.width = '0%';
+  void bar.offsetWidth;
+
+  if (duration === 0) {
+    bar.style.width = '100%';
+    return;
+  }
+
+  bar.classList.add('progress__bar--animate');
+}
+
+function resetProgressBar(bar) {
+  if (!bar) {
+    return;
+  }
+
+  bar.classList.remove('progress__bar--animate');
+  bar.style.transitionDuration = '';
+  bar.style.width = '0%';
+}
+
+function shouldReduceMotion() {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
