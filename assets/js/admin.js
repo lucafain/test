@@ -6,12 +6,13 @@ const STORAGE_KEYS = {
   adminLogs: 'frigorifico_admin_logs',
   payments: 'frigorifico_payment_status',
   paymentLogs: 'frigorifico_payment_logs',
-  manualPaymentWeek: 'frigorifico_manual_payment_week'
+  manualPaymentWeek: 'frigorifico_manual_payment_week',
+  customAdmins: 'frigorifico_custom_admins'
 };
 
 const AUTHORIZED_ADMINS = [
   {
-    username: 'martin',
+    username: 'Martin',
     password: '1234',
     displayName: 'Martin',
     permissions: { managePayments: true, clearOrders: true }
@@ -20,7 +21,7 @@ const AUTHORIZED_ADMINS = [
     username: 'luca',
     password: 'Luca-admin',
     displayName: 'Luca',
-    permissions: { managePayments: true, clearOrders: true }
+    permissions: { managePayments: true, clearOrders: true, manageAdmins: true }
   },
   {
     username: 'franco',
@@ -43,6 +44,11 @@ function normalizeAdminIdentifier(value) {
     .toLowerCase();
 }
 
+function getAllAuthorizedAdmins() {
+  const customAdmins = loadCustomAdmins();
+  return [...AUTHORIZED_ADMINS, ...customAdmins];
+}
+
 function findAuthorizedAdminByIdentifier(identifier) {
   if (!identifier) {
     return null;
@@ -53,8 +59,10 @@ function findAuthorizedAdminByIdentifier(identifier) {
     return null;
   }
 
+  const allAdmins = getAllAuthorizedAdmins();
+
   return (
-    AUTHORIZED_ADMINS.find(
+    allAdmins.find(
       (admin) => normalizeAdminIdentifier(admin.username) === normalized
     ) ?? null
   );
@@ -77,6 +85,9 @@ const CURRENCY_FORMATTER = new Intl.NumberFormat('es-AR', {
 });
 
 let clearOrdersButtonRef = null;
+let clearAdminHistoryButtonRef = null;
+let clearAdminLogsButtonRef = null;
+let clearPaymentLogsButtonRef = null;
 let currentAdminRecord = null;
 let adminLogsListRef = null;
 let paymentsSectionRef = null;
@@ -86,6 +97,11 @@ let paymentsToggleButtonRef = null;
 let paymentsListRef = null;
 let paymentsRangeLabelRef = null;
 let paymentLogsListRef = null;
+let adminManagementSectionRef = null;
+let addAdminFormRef = null;
+let addAdminMessageRef = null;
+let customAdminsListRef = null;
+let addAdminMessageTimeout = null;
 let paymentsVisible = false;
 let paymentOrdersCache = new Map();
 
@@ -116,6 +132,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const saveInventoryButton = document.getElementById('saveInventory');
   const ordersHistory = document.getElementById('ordersHistory');
   clearOrdersButtonRef = document.getElementById('clearOrdersButton');
+  clearAdminHistoryButtonRef = document.getElementById('clearAdminHistoryButton');
+  clearAdminLogsButtonRef = document.getElementById('clearAdminLogsButton');
+  clearPaymentLogsButtonRef = document.getElementById('clearPaymentLogsButton');
   const adminHistoryList = document.getElementById('adminHistory');
   adminLogsListRef = document.getElementById('adminLogs');
   paymentsSectionRef = document.getElementById('paymentsSection');
@@ -125,6 +144,10 @@ document.addEventListener('DOMContentLoaded', () => {
   paymentsListRef = document.getElementById('paymentsList');
   paymentsRangeLabelRef = document.getElementById('paymentsRangeLabel');
   paymentLogsListRef = document.getElementById('paymentLogs');
+  adminManagementSectionRef = document.getElementById('adminManagementSection');
+  addAdminFormRef = document.getElementById('addAdminForm');
+  addAdminMessageRef = document.getElementById('addAdminMessage');
+  customAdminsListRef = document.getElementById('customAdminsList');
   const loginError = document.getElementById('loginError');
   const processingSection = document.getElementById('adminProcessingSection');
   const processingBar = document.getElementById('adminProcessingBar');
@@ -139,6 +162,8 @@ document.addEventListener('DOMContentLoaded', () => {
   updateClearOrdersButton(hasOrders);
   renderAdminHistory(adminHistoryList);
   renderAdminLogs(adminLogsListRef);
+  renderCustomAdminsList(customAdminsListRef);
+  updateAdminResetButtons();
 
   if (paymentsToggleButtonRef) {
     paymentsToggleButtonRef.addEventListener('click', () => {
@@ -179,6 +204,132 @@ document.addEventListener('DOMContentLoaded', () => {
       const activeAdminName = getActiveAdminDisplayName();
       if (activeAdminName) {
         appendAdminLog('Borró el historial de pedidos', activeAdminName);
+      }
+    });
+  }
+
+  if (clearAdminHistoryButtonRef) {
+    clearAdminHistoryButtonRef.addEventListener('click', () => {
+      if (!currentAdminRecord || !isHistoryClearAllowed(currentAdminRecord)) {
+        return;
+      }
+
+      const confirmation = window.confirm(
+        '¿Seguro que desea reiniciar el registro de ingresos de administradores? Esta acción no se puede deshacer.'
+      );
+
+      if (!confirmation) {
+        return;
+      }
+
+      localStorage.removeItem(STORAGE_KEYS.adminHistory);
+      renderAdminHistory(adminHistoryList);
+      updateAdminResetButtons();
+      const activeAdminName = getActiveAdminDisplayName();
+      if (activeAdminName) {
+        appendAdminLog('Reinició el registro de ingresos de administradores', activeAdminName);
+      }
+    });
+  }
+
+  if (clearAdminLogsButtonRef) {
+    clearAdminLogsButtonRef.addEventListener('click', () => {
+      if (!currentAdminRecord || !isHistoryClearAllowed(currentAdminRecord)) {
+        return;
+      }
+
+      const confirmation = window.confirm(
+        '¿Seguro que desea reiniciar el registro de acciones? Esta acción no se puede deshacer.'
+      );
+
+      if (!confirmation) {
+        return;
+      }
+
+      localStorage.removeItem(STORAGE_KEYS.adminLogs);
+      renderAdminLogs(adminLogsListRef);
+      updateAdminResetButtons();
+      const activeAdminName = getActiveAdminDisplayName();
+      if (activeAdminName) {
+        appendAdminLog('Reinició el registro de acciones', activeAdminName);
+      }
+    });
+  }
+
+  if (clearPaymentLogsButtonRef) {
+    clearPaymentLogsButtonRef.addEventListener('click', () => {
+      if (!currentAdminRecord || !isHistoryClearAllowed(currentAdminRecord)) {
+        return;
+      }
+
+      const confirmation = window.confirm(
+        '¿Seguro que desea reiniciar el registro de pagos? Esta acción no se puede deshacer.'
+      );
+
+      if (!confirmation) {
+        return;
+      }
+
+      localStorage.removeItem(STORAGE_KEYS.paymentLogs);
+      renderPaymentLogs(paymentLogsListRef);
+      updateAdminResetButtons();
+      const activeAdminName = getActiveAdminDisplayName();
+      if (activeAdminName) {
+        appendAdminLog('Reinició el registro de pagos', activeAdminName);
+      }
+    });
+  }
+
+  if (addAdminFormRef) {
+    addAdminFormRef.addEventListener('submit', (event) => {
+      event.preventDefault();
+
+      if (!currentAdminRecord || !hasAdminPermission(currentAdminRecord, 'manageAdmins')) {
+        return;
+      }
+
+      const formData = new FormData(addAdminFormRef);
+      const name = (formData.get('newAdminName') || '').toString().trim();
+      const password = (formData.get('newAdminPassword') || '').toString().trim();
+
+      if (!name) {
+        showAddAdminMessage('Ingrese un nombre para el nuevo administrador.', 'error');
+        if (addAdminFormRef.newAdminName) {
+          addAdminFormRef.newAdminName.focus();
+        }
+        return;
+      }
+
+      if (!password) {
+        showAddAdminMessage('Ingrese una contraseña para el nuevo administrador.', 'error');
+        if (addAdminFormRef.newAdminPassword) {
+          addAdminFormRef.newAdminPassword.focus();
+        }
+        return;
+      }
+
+      const existingAdmin = findAuthorizedAdminByIdentifier(name);
+      if (existingAdmin) {
+        showAddAdminMessage('Ya existe un administrador con ese nombre.', 'error');
+        return;
+      }
+
+      const customAdmins = loadCustomAdmins();
+      customAdmins.push({
+        username: name,
+        password,
+        displayName: name,
+        permissions: {}
+      });
+
+      saveCustomAdmins(customAdmins);
+      renderCustomAdminsList(customAdminsListRef);
+      addAdminFormRef.reset();
+      showAddAdminMessage(`Se agregó a ${name} como administrador.`, 'success');
+
+      const activeAdminName = getActiveAdminDisplayName();
+      if (activeAdminName) {
+        appendAdminLog(`Agregó a ${name} como administrador`, activeAdminName);
       }
     });
   }
@@ -527,6 +678,43 @@ function updateClearOrdersButton(hasOrdersParam) {
   clearOrdersButtonRef.disabled = !hasOrders;
 }
 
+function updateAdminResetButtons() {
+  const canReset = isHistoryClearAllowed(currentAdminRecord);
+
+  configureResetButton(
+    clearAdminHistoryButtonRef,
+    canReset,
+    loadAdminHistoryEntries().length > 0
+  );
+
+  configureResetButton(
+    clearAdminLogsButtonRef,
+    canReset,
+    loadAdminLogs().length > 0
+  );
+
+  configureResetButton(
+    clearPaymentLogsButtonRef,
+    canReset,
+    loadPaymentLogs().length > 0
+  );
+}
+
+function configureResetButton(button, canReset, hasEntries) {
+  if (!button) {
+    return;
+  }
+
+  if (!canReset) {
+    button.hidden = true;
+    button.disabled = true;
+    return;
+  }
+
+  button.hidden = false;
+  button.disabled = !hasEntries;
+}
+
 function renderOrdersHistory(container) {
   const orders = loadOrders();
 
@@ -674,6 +862,21 @@ function updateAdminPermissions(adminRecord) {
       }
     }
   }
+
+  if (adminManagementSectionRef) {
+    if (hasAdminPermission(adminRecord, 'manageAdmins')) {
+      adminManagementSectionRef.classList.remove('card--hidden');
+      renderCustomAdminsList(customAdminsListRef);
+    } else {
+      adminManagementSectionRef.classList.add('card--hidden');
+      if (addAdminFormRef) {
+        addAdminFormRef.reset();
+      }
+      hideAddAdminMessage();
+    }
+  }
+
+  updateAdminResetButtons();
 }
 
 function isPaymentsAdmin(adminRecord) {
@@ -943,23 +1146,35 @@ function persistAdminLogin(name) {
   localStorage.setItem(STORAGE_KEYS.adminHistory, JSON.stringify(trimmedHistory));
 }
 
-function renderAdminHistory(container) {
+function loadAdminHistoryEntries() {
   const stored = localStorage.getItem(STORAGE_KEYS.adminHistory);
-  let history = [];
 
-  if (stored) {
-    try {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed)) {
-        history = parsed;
-      }
-    } catch (error) {
-      console.error('Error al leer historial de administradores', error);
-    }
+  if (!stored) {
+    return [];
   }
+
+  try {
+    const parsed = JSON.parse(stored);
+    if (Array.isArray(parsed)) {
+      return parsed;
+    }
+  } catch (error) {
+    console.error('Error al leer historial de administradores', error);
+  }
+
+  return [];
+}
+
+function renderAdminHistory(container) {
+  if (!container) {
+    return;
+  }
+
+  const history = loadAdminHistoryEntries();
 
   if (!history.length) {
     container.innerHTML = '<li>Aún no hay ingresos registrados.</li>';
+    updateAdminResetButtons();
     return;
   }
 
@@ -978,6 +1193,8 @@ function renderAdminHistory(container) {
       </li>
     `)
     .join('');
+
+  updateAdminResetButtons();
 }
 
 function loadAdminLogs() {
@@ -1019,6 +1236,7 @@ function renderAdminLogs(container) {
 
   if (!logs.length) {
     container.innerHTML = '<li class="history__empty">Aún no hay acciones registradas.</li>';
+    updateAdminResetButtons();
     return;
   }
 
@@ -1038,6 +1256,8 @@ function renderAdminLogs(container) {
       </li>
     `)
     .join('');
+
+  updateAdminResetButtons();
 }
 
 function loadPaymentStates() {
@@ -1160,6 +1380,7 @@ function renderPaymentLogs(container) {
 
   if (!logs.length) {
     container.innerHTML = '<li class="history__empty">Aún no hay movimientos registrados.</li>';
+    updateAdminResetButtons();
     return;
   }
 
@@ -1174,6 +1395,168 @@ function renderPaymentLogs(container) {
       </li>
     `)
     .join('');
+
+  updateAdminResetButtons();
+}
+
+function sanitizeCustomAdminEntry(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+
+  const usernameValue = typeof entry.username === 'string'
+    ? entry.username.trim()
+    : '';
+
+  const passwordValue = typeof entry.password === 'string'
+    ? entry.password
+    : '';
+
+  if (!usernameValue || !passwordValue) {
+    return null;
+  }
+
+  const displayNameValue = typeof entry.displayName === 'string' && entry.displayName.trim()
+    ? entry.displayName.trim()
+    : usernameValue;
+
+  const permissionsValue = entry.permissions && typeof entry.permissions === 'object' && !Array.isArray(entry.permissions)
+    ? { ...entry.permissions }
+    : {};
+
+  return {
+    username: usernameValue,
+    password: passwordValue,
+    displayName: displayNameValue,
+    permissions: permissionsValue
+  };
+}
+
+function loadCustomAdmins() {
+  const stored = localStorage.getItem(STORAGE_KEYS.customAdmins);
+
+  if (!stored) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(stored);
+    if (Array.isArray(parsed)) {
+      const deduplicated = new Map();
+
+      parsed.forEach((entry) => {
+        const sanitized = sanitizeCustomAdminEntry(entry);
+        if (!sanitized) {
+          return;
+        }
+
+        const key = normalizeAdminIdentifier(sanitized.username);
+        if (!key) {
+          return;
+        }
+
+        deduplicated.set(key, sanitized);
+      });
+
+      return Array.from(deduplicated.values());
+    }
+  } catch (error) {
+    console.error('Error al leer administradores adicionales', error);
+  }
+
+  return [];
+}
+
+function saveCustomAdmins(admins) {
+  if (!Array.isArray(admins)) {
+    localStorage.removeItem(STORAGE_KEYS.customAdmins);
+    return;
+  }
+
+  const deduplicated = new Map();
+
+  admins.forEach((entry) => {
+    const sanitized = sanitizeCustomAdminEntry(entry);
+    if (!sanitized) {
+      return;
+    }
+
+    const key = normalizeAdminIdentifier(sanitized.username);
+    if (!key) {
+      return;
+    }
+
+    deduplicated.set(key, sanitized);
+  });
+
+  const serialized = JSON.stringify(Array.from(deduplicated.values()));
+
+  try {
+    localStorage.setItem(STORAGE_KEYS.customAdmins, serialized);
+  } catch (error) {
+    console.error('Error al guardar administradores adicionales', error);
+  }
+}
+
+function renderCustomAdminsList(container) {
+  if (!container) {
+    return;
+  }
+
+  const admins = loadCustomAdmins();
+
+  if (!admins.length) {
+    container.innerHTML = '<li class="history__empty">Aún no hay administradores agregados.</li>';
+    return;
+  }
+
+  container.innerHTML = admins
+    .map((admin) => `
+      <li>
+        <strong>${admin.displayName ?? admin.username}</strong>
+      </li>
+    `)
+    .join('');
+}
+
+function showAddAdminMessage(message, type) {
+  if (!addAdminMessageRef) {
+    return;
+  }
+
+  if (addAdminMessageTimeout) {
+    clearTimeout(addAdminMessageTimeout);
+    addAdminMessageTimeout = null;
+  }
+
+  addAdminMessageRef.textContent = message;
+  addAdminMessageRef.hidden = false;
+  addAdminMessageRef.classList.remove('form__message--error', 'form__message--success');
+
+  if (type === 'error') {
+    addAdminMessageRef.classList.add('form__message--error');
+  } else if (type === 'success') {
+    addAdminMessageRef.classList.add('form__message--success');
+  }
+
+  addAdminMessageTimeout = setTimeout(() => {
+    hideAddAdminMessage();
+  }, 4000);
+}
+
+function hideAddAdminMessage() {
+  if (!addAdminMessageRef) {
+    return;
+  }
+
+  if (addAdminMessageTimeout) {
+    clearTimeout(addAdminMessageTimeout);
+    addAdminMessageTimeout = null;
+  }
+
+  addAdminMessageRef.textContent = '';
+  addAdminMessageRef.hidden = true;
+  addAdminMessageRef.classList.remove('form__message--error', 'form__message--success');
 }
 
 function formatCurrencyValue(value) {

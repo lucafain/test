@@ -72,13 +72,31 @@
         </section>
 
         <section class="card" id="adminHistorySection">
-          <h3>Ingresos de administradores</h3>
+          <div class="panel__sectionHeader">
+            <h3>Ingresos de administradores</h3>
+            <button
+              class="button button--danger"
+              type="button"
+              id="clearAdminHistoryButton"
+              hidden
+              disabled
+            >Reiniciar</button>
+          </div>
           <p>Registro de accesos recientes al panel.</p>
           <ul class="history" id="adminHistory"></ul>
         </section>
 
         <section class="card" id="adminLogsSection">
-          <h3>Registro de acciones</h3>
+          <div class="panel__sectionHeader">
+            <h3>Registro de acciones</h3>
+            <button
+              class="button button--danger"
+              type="button"
+              id="clearAdminLogsButton"
+              hidden
+              disabled
+            >Reiniciar</button>
+          </div>
           <p>Últimas operaciones realizadas por los administradores.</p>
           <ul class="history" id="adminLogs"></ul>
         </section>
@@ -96,9 +114,32 @@
         </section>
 
         <section class="card card--hidden" id="paymentLogsSection">
-          <h3>Registro de pagos</h3>
+          <div class="panel__sectionHeader">
+            <h3>Registro de pagos</h3>
+            <button
+              class="button button--danger"
+              type="button"
+              id="clearPaymentLogsButton"
+              hidden
+              disabled
+            >Reiniciar</button>
+          </div>
           <p>Seguimiento exclusivo de los cobros marcados.</p>
           <ul class="history" id="paymentLogs"></ul>
+        </section>
+
+        <section class="card card--hidden" id="adminManagementSection">
+          <h3>Gestión de administradores</h3>
+          <p>Agregue nuevos administradores autorizados para el panel.</p>
+          <form id="addAdminForm" class="form">
+            <label for="newAdminName">Nombre del nuevo administrador</label>
+            <input id="newAdminName" name="newAdminName" type="text" placeholder="Ej: Ana" autocomplete="off">
+            <label for="newAdminPassword">Contraseña</label>
+            <input id="newAdminPassword" name="newAdminPassword" type="password" placeholder="Defina una contraseña segura">
+            <p class="form__message" id="addAdminMessage" hidden aria-live="polite"></p>
+            <button class="button" type="submit">Agregar administrador</button>
+          </form>
+          <ul class="history" id="customAdminsList"></ul>
         </section>
       </div>
     </section>

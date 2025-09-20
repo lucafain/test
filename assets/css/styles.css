@@ -261,6 +261,11 @@ a {
   font-weight: 500;
 }
 
+.form__message--success {
+  color: #027a48;
+  font-weight: 500;
+}
+
 .radio {
   display: flex;
   align-items: flex-start;
