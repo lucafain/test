@@ -276,34 +276,18 @@ function hideMessage(container) {
 }
 
 function isOrderLocked() {
-  return localStorage.getItem(ORDER_LOCK_KEY) === 'true';
+  if (localStorage.getItem(ORDER_LOCK_KEY)) {
+    localStorage.removeItem(ORDER_LOCK_KEY);
+  }
+  return false;
 }
 
 function lockOrdering() {
-  localStorage.setItem(ORDER_LOCK_KEY, 'true');
+  localStorage.removeItem(ORDER_LOCK_KEY);
 }
 
 function resetOrderLockIfNeeded() {
-  if (localStorage.getItem(ORDER_LOCK_KEY) !== 'true') {
-    return;
-  }
-
-  const lastOrder = getLastOrder();
-  const orderTimestamp = Number(lastOrder?.timestamp);
-
-  if (!Number.isFinite(orderTimestamp)) {
-    localStorage.removeItem(ORDER_LOCK_KEY);
-    return;
-  }
-
-  const nextMondayTimestamp = calculateNextMondayTimestamp(orderTimestamp);
-
-  if (!Number.isFinite(nextMondayTimestamp)) {
-    localStorage.removeItem(ORDER_LOCK_KEY);
-    return;
-  }
-
-  if (Date.now() >= nextMondayTimestamp) {
+  if (localStorage.getItem(ORDER_LOCK_KEY)) {
     localStorage.removeItem(ORDER_LOCK_KEY);
   }
 }
