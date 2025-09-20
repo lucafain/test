@@ -159,7 +159,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!crateData || availableStock <= 0) {
       displayMessage(orderMessage, 'No hay stock disponible para el cajón seleccionado.');
-      renderCrateOptions(crateOptionsContainer, inventory, submitButton, orderMessage, globalAlert);
+      renderCrateOptions(
+        crateOptionsContainer,
+        inventory,
+        submitButton,
+        orderMessage,
+        globalAlert,
+        { preserveAlerts: true, preserveMessage: true }
+      );
       return;
     }
 
@@ -172,7 +179,14 @@ document.addEventListener('DOMContentLoaded', () => {
         : `Se está excediendo del stock disponible. El stock restante es ${availableStock} ${availableStock === 1 ? 'cajón' : 'cajones'}.`;
       displayMessage(orderMessage, stockMessage);
       showAlert(globalAlert, alertMessage);
-      renderCrateOptions(crateOptionsContainer, inventory, submitButton, orderMessage, globalAlert);
+      renderCrateOptions(
+        crateOptionsContainer,
+        inventory,
+        submitButton,
+        orderMessage,
+        globalAlert,
+        { preserveAlerts: true, preserveMessage: true }
+      );
       return;
     }
 

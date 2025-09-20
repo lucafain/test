@@ -440,8 +440,13 @@ function getWeekBoundaries(date) {
   start.setDate(start.getDate() - diffToMonday);
 
   const end = new Date(start);
-  end.setDate(end.getDate() + 7);
-  end.setHours(0, 0, 0, 0);
+  end.setDate(end.getDate() + 4);
+  end.setHours(23, 59, 59, 999);
+
+  const yearEnd = new Date(start.getFullYear(), 11, 31, 23, 59, 59, 999);
+  if (end > yearEnd) {
+    end.setTime(yearEnd.getTime());
+  }
 
   return { start, end };
 }
