@@ -1088,7 +1088,7 @@ function getWeekBoundaries(date) {
   start.setDate(start.getDate() - diffToMonday);
 
   const end = new Date(start);
-  end.setDate(end.getDate() + 4);
+  end.setDate(end.getDate() + 6);
   end.setHours(23, 59, 59, 999);
 
   return { start, end };
