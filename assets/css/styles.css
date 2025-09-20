@@ -95,6 +95,11 @@ a {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
+.button--small {
+  padding: 0.45rem 1.1rem;
+  font-size: 0.9rem;
+}
+
 .button:hover,
 .button:focus {
   transform: translateY(-2px);
@@ -490,6 +495,45 @@ a {
   box-shadow: 0 12px 26px rgba(31, 111, 139, 0.25);
 }
 
+.deliveryAccounts__item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.deliveryAccounts__content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.deliveryAccounts__info,
+.deliveryAccounts__meta {
+  margin: 0;
+}
+
+.deliveryAccounts__meta {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.deliveryAccounts__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+@media (min-width: 720px) {
+  .deliveryAccounts__item {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .deliveryAccounts__content {
+    flex: 1;
+  }
+}
+
 .payment__header {
   display: flex;
   justify-content: space-between;
@@ -666,6 +710,12 @@ a {
   align-items: center;
   gap: 1rem;
   margin-bottom: 1.5rem;
+}
+
+.panel__intro {
+  margin: 0 0 1.5rem;
+  color: var(--muted);
+  font-size: 0.95rem;
 }
 
 .panel__sectionHeader {

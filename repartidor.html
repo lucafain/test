@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portal de repartidores - Frigorífico V2.4</title>
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body class="page page--transition">
+  <header class="subheader">
+    <a class="subheader__back" href="index.html" data-transition>
+      <span class="subheader__icon" aria-hidden="true">🏠</span>
+      <span class="subheader__label">Salir</span>
+    </a>
+    <h1>Portal de repartidores</h1>
+  </header>
+
+  <main class="container" id="deliveryApp">
+    <section class="card" id="deliveryLoginSection">
+      <h2>Identificación</h2>
+      <p>Ingrese sus credenciales para acceder al portal.</p>
+      <form id="deliveryLoginForm" class="form">
+        <label for="deliveryUser">Usuario</label>
+        <input id="deliveryUser" name="deliveryUser" type="text" required placeholder="Ej: repartidor1">
+        <label for="deliveryPassword">Contraseña</label>
+        <input id="deliveryPassword" name="deliveryPassword" type="password" required placeholder="Ingrese su contraseña">
+        <p class="form__message form__message--error" id="deliveryLoginError" hidden aria-live="polite"></p>
+        <button class="button" type="submit">Ingresar</button>
+      </form>
+    </section>
+
+    <section class="card card--hidden" id="deliveryPanel">
+      <div class="panel__header">
+        <h2>Bienvenido, <span id="deliveryNameDisplay"></span></h2>
+        <button class="button button--secondary" type="button" id="deliveryLogoutButton">Cerrar sesión</button>
+      </div>
+      <p class="panel__intro">Gestione o consulte las credenciales habilitadas para el reparto.</p>
+      <div class="grid">
+        <section class="card" id="deliveryManagementCard" hidden>
+          <h3>Administrar repartidores</h3>
+          <p>Agregue usuarios y contraseñas para habilitar el acceso al portal.</p>
+          <form id="addDeliveryForm" class="form">
+            <label for="newDeliveryUser">Usuario</label>
+            <input id="newDeliveryUser" name="newDeliveryUser" type="text" autocomplete="off" placeholder="Ej: chofer1">
+            <label for="newDeliveryPassword">Contraseña</label>
+            <input id="newDeliveryPassword" name="newDeliveryPassword" type="password" autocomplete="off" placeholder="Defina una contraseña segura">
+            <p class="form__message" id="addDeliveryMessage" hidden aria-live="polite"></p>
+            <button class="button" type="submit">Agregar repartidor</button>
+          </form>
+          <ul class="history" id="deliveryAccountsList"></ul>
+        </section>
+
+        <section class="card" id="deliveryInfoCard">
+          <h3>Indicaciones</h3>
+          <p>
+            Este espacio es exclusivo para el equipo de distribución. Si tiene dudas sobre su
+            acceso comuníquese con Luca o Martin para recibir nuevas credenciales.
+          </p>
+          <p id="deliveryInfoMessage">Espere las indicaciones del administrador antes de registrar retiros o entregas.</p>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>&copy; <span id="year"></span> Frigorífico V2.4. Solo para uso interno.</p>
+  </footer>
+
+  <script src="assets/js/repartidor.js"></script>
+</body>
+</html>
