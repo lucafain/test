@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel de administración - Frigorífico V2.4</title>
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body class="page page--transition">
+  <header class="subheader">
+    <a class="subheader__back" href="index.html" data-transition>
+      <span class="subheader__icon" aria-hidden="true">🏠</span>
+      <span class="subheader__label">Salir</span>
+    </a>
+    <h1>Panel de administración</h1>
+  </header>
+
+  <main class="container" id="adminApp">
+    <section class="card" id="loginSection">
+      <h2>Identificación</h2>
+      <p>Ingrese sus credenciales para acceder al panel.</p>
+      <form id="loginForm" class="form">
+        <label for="adminName">Nombre del administrador</label>
+        <input id="adminName" name="adminName" type="text" required placeholder="Ej: Juan Pérez">
+        <label for="adminPassword">Contraseña</label>
+        <input id="adminPassword" name="adminPassword" type="password" required placeholder="Ingrese su contraseña">
+        <p class="form__message form__message--error" id="loginError" hidden aria-live="polite"></p>
+        <button class="button" type="submit">Ingresar</button>
+      </form>
+    </section>
+
+    <section class="card card--hidden" id="adminProcessingSection" aria-live="polite">
+      <h2>Validando acceso</h2>
+      <p>Preparando la información más reciente del panel...</p>
+      <div class="progress">
+        <span class="progress__label" id="adminProcessingPercent">0%</span>
+        <div class="progress__bar" id="adminProcessingBar"></div>
+      </div>
+    </section>
+
+    <section class="card card--hidden" id="panelSection">
+      <div class="panel__header">
+        <h2>Bienvenido, <span id="adminNameDisplay"></span></h2>
+        <button class="button button--secondary" id="logoutButton">Cerrar sesión</button>
+      </div>
+
+      <div class="grid">
+        <section class="card" id="inventorySection">
+          <h3>Stock y precios</h3>
+          <p>Actualice el stock disponible y el precio por cajón.</p>
+          <div class="table" role="table">
+            <div class="table__header" role="row">
+              <span role="columnheader">Cajón</span>
+              <span role="columnheader">Stock disponible</span>
+              <span role="columnheader">Precio (ARS)</span>
+            </div>
+            <div id="inventoryRows"></div>
+          </div>
+          <button class="button" id="saveInventory">Guardar cambios</button>
+        </section>
+
+        <section class="card" id="ordersSection">
+          <div class="panel__sectionHeader">
+            <h3>Historial de pedidos</h3>
+            <button
+              class="button button--danger"
+              type="button"
+              id="clearOrdersButton"
+              hidden
+              disabled
+            >Borrar historial</button>
+          </div>
+          <p>Últimos pedidos enviados por los clientes.</p>
+          <ul class="history" id="ordersHistory"></ul>
+        </section>
+
+        <section class="card" id="adminHistorySection">
+          <div class="panel__sectionHeader">
+            <h3>Ingresos de administradores</h3>
+            <button
+              class="button button--danger"
+              type="button"
+              id="clearAdminHistoryButton"
+              hidden
+              disabled
+            >Reiniciar</button>
+          </div>
+          <p>Registro de accesos recientes al panel.</p>
+          <ul class="history" id="adminHistory"></ul>
+        </section>
+
+        <section class="card" id="adminLogsSection">
+          <div class="panel__sectionHeader">
+            <h3>Registro de acciones</h3>
+            <button
+              class="button button--danger"
+              type="button"
+              id="clearAdminLogsButton"
+              hidden
+              disabled
+            >Reiniciar</button>
+          </div>
+          <p>Últimas operaciones realizadas por los administradores.</p>
+          <ul class="history" id="adminLogs"></ul>
+        </section>
+
+        <section class="card card--hidden" id="paymentsSection">
+          <div class="panel__sectionHeader">
+            <h3>Pagos</h3>
+            <button class="button button--secondary" type="button" id="paymentsToggle">Ver pedidos de la semana</button>
+          </div>
+          <p>Gestione los cobros de la semana en curso (lunes a domingo) y registre su estado.</p>
+          <div id="paymentsContent" hidden>
+            <div class="paymentWeeks" id="paymentWeekSelector"></div>
+            <p class="history__groupTitle" id="paymentsRangeLabel"></p>
+            <ul class="history history--payments" id="paymentsList"></ul>
+          </div>
+        </section>
+
+        <section class="card card--hidden" id="paymentLogsSection">
+          <div class="panel__sectionHeader">
+            <h3>Registro de pagos</h3>
+            <button
+              class="button button--danger"
+              type="button"
+              id="clearPaymentLogsButton"
+              hidden
+              disabled
+            >Reiniciar</button>
+          </div>
+          <p>Seguimiento exclusivo de los cobros marcados.</p>
+          <ul class="history" id="paymentLogs"></ul>
+        </section>
+
+        <section class="card card--hidden" id="adminManagementSection">
+          <h3>Gestión de administradores</h3>
+          <p>Agregue nuevos administradores autorizados para el panel.</p>
+          <form id="addAdminForm" class="form">
+            <label for="newAdminName">Nombre del nuevo administrador</label>
+            <input id="newAdminName" name="newAdminName" type="text" placeholder="Ej: Ana" autocomplete="off">
+            <label for="newAdminPassword">Contraseña</label>
+            <input id="newAdminPassword" name="newAdminPassword" type="password" placeholder="Defina una contraseña segura">
+            <p class="form__message" id="addAdminMessage" hidden aria-live="polite"></p>
+            <button class="button" type="submit">Agregar administrador</button>
+          </form>
+          <ul class="history" id="customAdminsList"></ul>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>&copy; <span id="year"></span> Frigorífico V2.4. Solo para uso interno.</p>
+  </footer>
+
+  <script src="assets/js/admin.js"></script>
+</body>
+</html>

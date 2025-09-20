@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enviar pedido - Frigorífico V2.4</title>
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body class="page page--transition">
+  <header class="subheader">
+    <a class="subheader__back" href="index.html" data-transition>
+      <span class="subheader__icon" aria-hidden="true">🏠</span>
+      <span class="subheader__label">Salir</span>
+    </a>
+    <h1>Solicitud de pedido mayorista</h1>
+  </header>
+
+  <main class="container">
+    <div class="alert alert--warning" id="globalAlert" hidden role="alert"></div>
+
+    <section class="card" id="orderSection">
+      <h2>Complete los datos de su comercio</h2>
+      <form id="orderForm" class="form">
+        <label for="storeName">Nombre del local</label>
+        <input id="storeName" name="storeName" type="text" required placeholder="Ej: Carnicería Kosher Central">
+
+        <label for="storeAddress">Dirección completa</label>
+        <input id="storeAddress" name="storeAddress" type="text" required placeholder="Ej: Av. Ejemplo 1234, CABA">
+
+        <label for="crateQuantity">Cantidad de cajones</label>
+        <input
+          id="crateQuantity"
+          name="crateQuantity"
+          type="number"
+          min="1"
+          step="1"
+          required
+          placeholder="Ej: 3"
+        >
+
+        <fieldset class="form__fieldset" id="crateOptionsFieldset">
+          <legend>¿Qué cajón necesita?</legend>
+          <div id="crateOptions"></div>
+        </fieldset>
+
+        <p class="form__message form__message--error" id="orderMessage" hidden aria-live="polite"></p>
+
+        <button class="button" type="submit">Enviar pedido</button>
+      </form>
+    </section>
+
+    <section class="card card--hidden" id="reviewSection">
+      <h2>Revisá tu pedido</h2>
+      <p class="review__intro">Por seguridad, verificá que los datos sean correctos antes de confirmar.</p>
+      <div class="confirmation__details" id="reviewDetails"></div>
+      <div class="review__actions">
+        <button class="button button--secondary" type="button" id="reviewBack">Volver para editar</button>
+        <button class="button" type="button" id="reviewConfirm">Confirmar pedido</button>
+      </div>
+    </section>
+
+    <section class="card card--hidden" id="processingSection" aria-live="polite">
+      <h2>Registrando su pedido</h2>
+      <p>Estamos guardando los datos. Aguarde mientras completamos el proceso.</p>
+      <div class="progress">
+        <span class="progress__label" id="processingPercent">0%</span>
+        <div class="progress__bar" id="processingBar"></div>
+      </div>
+    </section>
+
+    <section class="card card--hidden card--thanks" id="confirmation">
+      <h2>¡Gracias por su compra!</h2>
+      <div class="confirmation__details" id="confirmationDetails"></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>&copy; <span id="year"></span> Frigorífico V2.4. Ventas mayoristas.</p>
+  </footer>
+
+  <script src="assets/js/pedido.js"></script>
+</body>
+</html>
