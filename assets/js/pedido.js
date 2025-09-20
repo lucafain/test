@@ -96,10 +96,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (quantity > availableStock) {
-      displayMessage(
-        orderMessage,
-        `Solo quedan ${availableStock} cajones disponibles de ese tipo.`
-      );
+      const stockMessage = availableStock === 1
+        ? 'No es posible completar el pedido. El máximo disponible es 1 cajón.'
+        : `No es posible completar el pedido. El máximo disponible es ${availableStock} cajones.`;
+      displayMessage(orderMessage, stockMessage);
       renderCrateOptions(crateOptionsContainer, inventory, submitButton, orderMessage);
       return;
     }
@@ -113,6 +113,8 @@ document.addEventListener('DOMContentLoaded', () => {
     inventory = updatedInventory;
 
     const crateLabel = crateData.label;
+    const unitPrice = Number.isFinite(crateData.price) ? Number(crateData.price) : 0;
+    const totalPrice = unitPrice > 0 ? unitPrice * quantity : 0;
 
     const order = {
       storeName,
@@ -120,6 +122,8 @@ document.addEventListener('DOMContentLoaded', () => {
       crateSize: crateLabel,
       crateId,
       quantity,
+      unitPrice,
+      totalPrice,
       timestamp: Date.now()
     };
 
@@ -205,14 +209,17 @@ function renderCrateOptions(container, inventory, submitButton, messageContainer
       availableCount += 1;
     }
 
-    const priceText = price > 0 ? ` · Precio: ${formatCurrency(price)}` : '';
-    const stockText = `Stock: ${stock} ${stock === 1 ? 'cajón' : 'cajones'}`;
+    const metaParts = [];
+    if (price > 0) {
+      metaParts.push(`Precio: ${formatCurrency(price)}`);
+    }
+    const metaText = metaParts.join(' · ');
 
     return `
       <label class="radio${available ? '' : ' radio--disabled'}">
         <input type="radio" name="crateSize" value="${option.id}" data-label="${option.label}" ${available ? '' : 'disabled'}>
         <span class="radio__title">${option.label}</span>
-        <span class="radio__meta">${stockText}${priceText}</span>
+        <span class="radio__meta">${metaText}</span>
       </label>
     `;
   }).join('');
@@ -301,13 +308,24 @@ function renderConfirmation(container, order, crateData) {
     `<strong>Cajón solicitado:</strong> ${order.crateSize}`
   ];
 
-  if (crateData) {
-    if (crateData.price) {
-      details.push(`<strong>Precio vigente:</strong> ${formatCurrency(crateData.price)}`);
-    }
-    details.push(
-      `<strong>Stock restante:</strong> ${crateData.stock} ${crateData.stock === 1 ? 'cajón' : 'cajones'}`
-    );
+  const normalizedUnitPrice = Number.isFinite(order.unitPrice)
+    ? Number(order.unitPrice)
+    : Number.isFinite(crateData?.price)
+      ? Number(crateData.price)
+      : 0;
+
+  const normalizedTotalPrice = Number.isFinite(order.totalPrice)
+    ? Number(order.totalPrice)
+    : normalizedUnitPrice > 0
+      ? normalizedUnitPrice * order.quantity
+      : 0;
+
+  if (normalizedUnitPrice > 0) {
+    details.push(`<strong>Precio unitario:</strong> ${formatCurrency(normalizedUnitPrice)}`);
+  }
+
+  if (normalizedTotalPrice > 0) {
+    details.push(`<strong>Total estimado:</strong> ${formatCurrency(normalizedTotalPrice)}`);
   }
 
   container.innerHTML = details.map((detail) => `<p>${detail}</p>`).join('');
