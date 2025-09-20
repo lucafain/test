@@ -80,6 +80,21 @@ a {
   flex-wrap: wrap;
 }
 
+.hero__link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 190px;
+}
+
+.hero__note {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.85);
+  letter-spacing: 0.01em;
+  text-align: center;
+}
+
 .button {
   display: inline-flex;
   align-items: center;

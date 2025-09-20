@@ -26,6 +26,9 @@ let currentAccount = null;
 let loginSectionRef = null;
 let loginFormRef = null;
 let loginErrorRef = null;
+let processingSectionRef = null;
+let processingBarRef = null;
+let processingLabelRef = null;
 let portalSectionRef = null;
 let nameDisplayRef = null;
 let logoutButtonRef = null;
@@ -48,6 +51,9 @@ document.addEventListener('DOMContentLoaded', () => {
   loginSectionRef = document.getElementById('deliveryLoginSection');
   loginFormRef = document.getElementById('deliveryLoginForm');
   loginErrorRef = document.getElementById('deliveryLoginError');
+  processingSectionRef = document.getElementById('deliveryProcessingSection');
+  processingBarRef = document.getElementById('deliveryProcessingBar');
+  processingLabelRef = document.getElementById('deliveryProcessingPercent');
   portalSectionRef = document.getElementById('deliveryPanel');
   nameDisplayRef = document.getElementById('deliveryNameDisplay');
   logoutButtonRef = document.getElementById('deliveryLogoutButton');
@@ -93,7 +99,22 @@ function handleLoginSubmit(event) {
 
   clearLoginError();
   loginFormRef.reset();
-  enterDeliveryPortal(account);
+  if (portalSectionRef) {
+    portalSectionRef.classList.add('card--hidden');
+  }
+
+  if (loginSectionRef) {
+    loginSectionRef.classList.add('card--hidden');
+  }
+
+  startProcessingTransition(
+    processingSectionRef,
+    processingBarRef,
+    () => {
+      enterDeliveryPortal(account);
+    },
+    processingLabelRef
+  );
 }
 
 function findDeliveryAccount(identifier) {
@@ -135,8 +156,13 @@ function enterDeliveryPortal(account) {
     loginSectionRef.classList.add('card--hidden');
   }
 
+  if (processingSectionRef) {
+    processingSectionRef.classList.add('card--hidden');
+  }
+
   if (portalSectionRef) {
     portalSectionRef.classList.remove('card--hidden');
+    activateCard(portalSectionRef);
   }
 
   if (nameDisplayRef) {
@@ -175,7 +201,15 @@ function handleLogout() {
 
   if (loginSectionRef) {
     loginSectionRef.classList.remove('card--hidden');
+    activateCard(loginSectionRef);
   }
+
+  if (processingSectionRef) {
+    processingSectionRef.classList.add('card--hidden');
+  }
+
+  resetProgressBar(processingBarRef);
+  resetProgressLabel(processingLabelRef);
 
   if (nameDisplayRef) {
     nameDisplayRef.textContent = '';
@@ -501,6 +535,137 @@ function formatDate(value) {
   }
 }
 
+function activateCard(cardElement) {
+  if (!cardElement) {
+    return;
+  }
+
+  cardElement.classList.remove('card--active');
+  void cardElement.offsetWidth;
+  cardElement.classList.add('card--active');
+
+  const cleanupDelay = shouldReduceMotion() ? 0 : 500;
+  setTimeout(() => {
+    cardElement.classList.remove('card--active');
+  }, cleanupDelay);
+}
+
+function startProcessingTransition(section, bar, callback, label) {
+  if (!section) {
+    callback();
+    return;
+  }
+
+  section.classList.remove('card--hidden');
+  activateCard(section);
+
+  resetProgressBar(bar);
+  resetProgressLabel(label);
+
+  const duration = shouldReduceMotion() ? 0 : 4000;
+
+  animateProgressBar(bar, duration);
+  animateProgressLabel(label, duration);
+
+  if (duration === 0) {
+    section.classList.add('card--hidden');
+    resetProgressBar(bar);
+    completeProgressLabel(label);
+    callback();
+    return;
+  }
+
+  setTimeout(() => {
+    section.classList.add('card--hidden');
+    resetProgressBar(bar);
+    completeProgressLabel(label);
+    callback();
+  }, duration);
+}
+
+function animateProgressBar(bar, duration) {
+  if (!bar) {
+    return;
+  }
+
+  bar.classList.remove('progress__bar--animate');
+  bar.style.transitionDuration = `${duration}ms`;
+
+  void bar.offsetWidth;
+  bar.classList.add('progress__bar--animate');
+}
+
+function resetProgressBar(bar) {
+  if (!bar) {
+    return;
+  }
+
+  bar.classList.remove('progress__bar--animate');
+  bar.style.transitionDuration = '';
+}
+
+function animateProgressLabel(label, duration) {
+  if (!label) {
+    return;
+  }
+
+  const previousFrameId = Number.parseInt(label.dataset.progressAnimationFrame ?? '', 10);
+  if (Number.isFinite(previousFrameId)) {
+    cancelAnimationFrame(previousFrameId);
+  }
+
+  const start = performance.now();
+
+  const tick = (now) => {
+    const elapsed = now - start;
+    const progress = Math.min(elapsed / duration, 1);
+    label.textContent = `${Math.round(progress * 100)}%`;
+
+    if (progress < 1) {
+      const frameId = requestAnimationFrame(tick);
+      label.dataset.progressAnimationFrame = String(frameId);
+    } else {
+      delete label.dataset.progressAnimationFrame;
+    }
+  };
+
+  if (duration === 0) {
+    label.textContent = '100%';
+    delete label.dataset.progressAnimationFrame;
+    return;
+  }
+
+  const frameId = requestAnimationFrame(tick);
+  label.dataset.progressAnimationFrame = String(frameId);
+}
+
+function resetProgressLabel(label) {
+  if (!label) {
+    return;
+  }
+
+  const frameId = Number.parseInt(label.dataset.progressAnimationFrame ?? '', 10);
+  if (Number.isFinite(frameId)) {
+    cancelAnimationFrame(frameId);
+  }
+
+  delete label.dataset.progressAnimationFrame;
+  label.textContent = '0%';
+}
+
+function completeProgressLabel(label) {
+  if (!label) {
+    return;
+  }
+
+  label.textContent = '100%';
+  delete label.dataset.progressAnimationFrame;
+}
+
+function shouldReduceMotion() {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
 function activatePage() {
   if (document.body && document.body.classList.contains('page--transition')) {
     requestAnimationFrame(() => {
@@ -535,7 +700,7 @@ function triggerPageExit(callback) {
 
   document.body.classList.add('page--exit');
 
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  if (shouldReduceMotion()) {
     callback();
     return;
   }
