@@ -21,11 +21,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const orderForm = document.getElementById('orderForm');
   const confirmationSection = document.getElementById('confirmation');
   const confirmationDetails = document.getElementById('confirmationDetails');
+  const reviewSection = document.getElementById('reviewSection');
+  const reviewDetails = document.getElementById('reviewDetails');
+  const reviewConfirmButton = document.getElementById('reviewConfirm');
+  const reviewBackButton = document.getElementById('reviewBack');
   const crateOptionsContainer = document.getElementById('crateOptions');
   const orderMessage = document.getElementById('orderMessage');
   const submitButton = orderForm.querySelector('button[type="submit"]');
+  const globalAlert = document.getElementById('globalAlert');
 
   let inventory = normalizeInventory(loadInventory());
+  let pendingOrderContext = null;
 
   resetOrderLockIfNeeded();
 
@@ -34,11 +40,63 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
-  renderCrateOptions(crateOptionsContainer, inventory, submitButton, orderMessage);
+  renderCrateOptions(crateOptionsContainer, inventory, submitButton, orderMessage, globalAlert);
 
   orderForm.addEventListener('input', () => {
     hideMessage(orderMessage);
+    hideAlert(globalAlert);
+    pendingOrderContext = null;
   });
+
+  if (reviewBackButton) {
+    reviewBackButton.addEventListener('click', () => {
+      hideAlert(globalAlert);
+      reviewSection.classList.add('card--hidden');
+      confirmationSection.classList.add('card--hidden');
+      orderSection.classList.remove('card--hidden');
+      if (pendingOrderContext) {
+        pendingOrderContext = null;
+      }
+      const firstInvalid = orderForm.querySelector(':invalid');
+      if (firstInvalid) {
+        firstInvalid.focus();
+      }
+    });
+  }
+
+  if (reviewConfirmButton) {
+    reviewConfirmButton.addEventListener('click', () => {
+      if (!pendingOrderContext) {
+        return;
+      }
+
+      const { order, updatedInventory, crateData } = pendingOrderContext;
+      const orderToPersist = {
+        ...order,
+        timestamp: Date.now()
+      };
+
+      persistInventory(updatedInventory);
+      inventory = normalizeInventory(updatedInventory);
+      persistOrder(orderToPersist);
+      lockOrdering();
+
+      const refreshedCrateData = inventory.find((item) => item.id === order.crateId) ?? crateData ?? null;
+
+      renderConfirmation(confirmationDetails, orderToPersist, refreshedCrateData);
+
+      pendingOrderContext = null;
+
+      reviewSection.classList.add('card--hidden');
+      orderSection.classList.add('card--hidden');
+      confirmationSection.classList.remove('card--hidden');
+
+      orderForm.reset();
+      hideMessage(orderMessage);
+      hideAlert(globalAlert);
+      renderCrateOptions(crateOptionsContainer, inventory, submitButton, orderMessage, globalAlert);
+    });
+  }
 
   orderForm.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -60,6 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
     );
 
     hideMessage(orderMessage);
+    hideAlert(globalAlert);
 
     if (!storeName) {
       displayMessage(orderMessage, 'Ingrese el nombre de su local para continuar.');
@@ -93,7 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!crateData || availableStock <= 0) {
       displayMessage(orderMessage, 'No hay stock disponible para el cajón seleccionado.');
-      renderCrateOptions(crateOptionsContainer, inventory, submitButton, orderMessage);
+      renderCrateOptions(crateOptionsContainer, inventory, submitButton, orderMessage, globalAlert);
       return;
     }
 
@@ -101,18 +160,21 @@ document.addEventListener('DOMContentLoaded', () => {
       const stockMessage = availableStock === 1
         ? 'No es posible completar el pedido. El máximo disponible es 1 cajón.'
         : `No es posible completar el pedido. El máximo disponible es ${availableStock} cajones.`;
+      const alertMessage = availableStock === 0
+        ? 'Se está excediendo del stock disponible. No quedan cajones en inventario.'
+        : `Se está excediendo del stock disponible. El stock restante es ${availableStock} ${availableStock === 1 ? 'cajón' : 'cajones'}.`;
       displayMessage(orderMessage, stockMessage);
-      renderCrateOptions(crateOptionsContainer, inventory, submitButton, orderMessage);
+      showAlert(globalAlert, alertMessage);
+      renderCrateOptions(crateOptionsContainer, inventory, submitButton, orderMessage, globalAlert);
       return;
     }
 
     const remainingStock = availableStock - quantity;
     const updatedInventory = inventory.map((item) =>
-      item.id === crateId ? { ...item, stock: remainingStock } : item
+      item.id === crateId
+        ? { ...item, stock: remainingStock }
+        : item
     );
-
-    persistInventory(updatedInventory);
-    inventory = updatedInventory;
 
     const crateLabel = crateData.label;
     const unitPrice = Number.isFinite(crateData.price) ? Number(crateData.price) : 0;
@@ -125,23 +187,20 @@ document.addEventListener('DOMContentLoaded', () => {
       crateId,
       quantity,
       unitPrice,
-      totalPrice,
-      timestamp: Date.now()
+      totalPrice
     };
 
-    persistOrder(order);
-    lockOrdering();
-
-    renderConfirmation(
-      confirmationDetails,
+    pendingOrderContext = {
       order,
-      updatedInventory.find((item) => item.id === crateId) ?? null
-    );
+      updatedInventory,
+      crateData
+    };
+
+    renderOrderDetails(reviewDetails, order, crateData);
 
     orderSection.classList.add('card--hidden');
-    confirmationSection.classList.remove('card--hidden');
-    orderForm.reset();
-    renderCrateOptions(crateOptionsContainer, inventory, submitButton, orderMessage);
+    confirmationSection.classList.add('card--hidden');
+    reviewSection.classList.remove('card--hidden');
   });
 });
 
@@ -190,12 +249,12 @@ function normalizeInventory(inventory) {
       id: option.id,
       label: option.label,
       stock: Number.isFinite(stockValue) && stockValue > 0 ? stockValue : 0,
-      price: Number.isFinite(priceValue) && priceValue > 0 ? Number(priceValue.toFixed(2)) : 0
+      price: Number.isFinite(priceValue) && priceValue >= 0 ? priceValue : 0
     };
   });
 }
 
-function renderCrateOptions(container, inventory, submitButton, messageContainer) {
+function renderCrateOptions(container, inventory, submitButton, messageContainer, alertContainer) {
   if (!container) {
     return;
   }
@@ -240,8 +299,14 @@ function renderCrateOptions(container, inventory, submitButton, messageContainer
       messageContainer,
       'En este momento no hay stock disponible para realizar pedidos.'
     );
+    showAlert(
+      alertContainer,
+      'Momentáneamente no hay stock disponible para ningún cajón. '
+        + 'Por favor, vuelva a intentar más tarde.'
+    );
   } else {
     hideMessage(messageContainer);
+    hideAlert(alertContainer);
   }
 }
 
@@ -267,6 +332,24 @@ function displayMessage(container, message) {
 }
 
 function hideMessage(container) {
+  if (!container) {
+    return;
+  }
+
+  container.textContent = '';
+  container.hidden = true;
+}
+
+function showAlert(container, message) {
+  if (!container) {
+    return;
+  }
+
+  container.textContent = message;
+  container.hidden = !message;
+}
+
+function hideAlert(container) {
   if (!container) {
     return;
   }
@@ -307,11 +390,16 @@ function getLastOrder() {
   return null;
 }
 
-function renderConfirmation(container, order, crateData) {
+function renderOrderDetails(container, order, crateData) {
   if (!container || !order) {
     return;
   }
 
+  const details = buildOrderDetails(order, crateData);
+  container.innerHTML = details.map((detail) => `<p>${detail}</p>`).join('');
+}
+
+function buildOrderDetails(order, crateData) {
   const details = [
     `<strong>Comercio:</strong> ${order.storeName}`,
     `<strong>Dirección:</strong> ${order.storeAddress}`,
@@ -339,7 +427,11 @@ function renderConfirmation(container, order, crateData) {
     details.push(`<strong>Total estimado:</strong> ${formatCurrency(normalizedTotalPrice)}`);
   }
 
-  container.innerHTML = details.map((detail) => `<p>${detail}</p>`).join('');
+  return details;
+}
+
+function renderConfirmation(container, order, crateData) {
+  renderOrderDetails(container, order, crateData);
 }
 
 function showLockedConfirmation(orderSection, confirmationSection, confirmationDetails, inventory) {

@@ -13,6 +13,8 @@
   </header>
 
   <main class="container">
+    <div class="alert alert--warning" id="globalAlert" hidden role="alert"></div>
+
     <section class="card" id="orderSection">
       <h2>Complete los datos de su comercio</h2>
       <form id="orderForm" class="form">
@@ -42,6 +44,16 @@
 
         <button class="button" type="submit">Enviar pedido</button>
       </form>
+    </section>
+
+    <section class="card card--hidden" id="reviewSection">
+      <h2>Revisá tu pedido</h2>
+      <p class="review__intro">Por seguridad, verificá que los datos sean correctos antes de confirmar.</p>
+      <div class="confirmation__details" id="reviewDetails"></div>
+      <div class="review__actions">
+        <button class="button button--secondary" type="button" id="reviewBack">Volver para editar</button>
+        <button class="button" type="button" id="reviewConfirm">Confirmar pedido</button>
+      </div>
     </section>
 
     <section class="card card--hidden" id="confirmation">

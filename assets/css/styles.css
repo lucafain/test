@@ -298,11 +298,48 @@ a {
   display: none;
 }
 
+.alert {
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  font-weight: 600;
+}
+
+.alert[hidden] {
+  display: none;
+}
+
+.alert:not([hidden]) {
+  display: block;
+}
+
+.alert--warning {
+  background: rgba(242, 161, 84, 0.12);
+  border: 1px solid rgba(242, 161, 84, 0.45);
+  color: #8a3b12;
+}
+
 .confirmation__details {
   margin: 1.5rem 0;
   padding: 1.5rem;
   background: rgba(31, 111, 139, 0.08);
   border-radius: var(--radius);
+}
+
+.review__intro {
+  margin-top: 0;
+  color: var(--muted);
+}
+
+.review__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.review__actions .button {
+  flex: 1 1 200px;
 }
 
 .panel__header {

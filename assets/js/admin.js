@@ -111,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
         id: crate.id,
         label: crate.label,
         stock: Number.isFinite(stock) && stock >= 0 ? stock : 0,
-        price: Number.isFinite(price) && price >= 0 ? Number(price.toFixed(2)) : 0
+        price: Number.isFinite(price) && price >= 0 ? price : 0
       };
     });
 
@@ -237,7 +237,7 @@ function renderInventoryRows(inventory, container) {
         <div class="table__row" role="row">
           <span>${item.label}</span>
           <input type="number" min="0" step="1" data-type="stock" data-id="${item.id}" value="${item.stock}">
-          <input type="number" min="0" step="0.01" data-type="price" data-id="${item.id}" value="${item.price}">
+          <input type="number" min="0" step="any" data-type="price" data-id="${item.id}" value="${item.price}">
         </div>
       `
     )
