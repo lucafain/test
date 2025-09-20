@@ -38,6 +38,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let inventory = normalizeInventory(loadInventory());
   let pendingOrderContext = null;
+  const orderDraft = createEmptyOrderDraft();
+
+  populateOrderDraftFromForm(orderForm, orderDraft);
 
   resetOrderLockIfNeeded();
 
@@ -46,14 +49,32 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
-  renderCrateOptions(crateOptionsContainer, inventory, submitButton, orderMessage, globalAlert);
+  renderCrateOptions(
+    crateOptionsContainer,
+    inventory,
+    submitButton,
+    orderMessage,
+    globalAlert,
+    { selectedCrateId: orderDraft.crateId, orderDraft }
+  );
   activateCard(orderSection);
 
-  orderForm.addEventListener('input', () => {
+  orderForm.addEventListener('reset', () => {
+    resetOrderDraft(orderDraft);
+  });
+
+  const handleOrderFormInteraction = (event) => {
     hideMessage(orderMessage);
     hideAlert(globalAlert);
     pendingOrderContext = null;
-  });
+
+    if (event && event.target) {
+      updateOrderDraftField(orderDraft, event.target);
+    }
+  };
+
+  orderForm.addEventListener('input', handleOrderFormInteraction);
+  orderForm.addEventListener('change', handleOrderFormInteraction);
 
   if (reviewBackButton) {
     reviewBackButton.addEventListener('click', () => {
@@ -64,7 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
       activateCard(orderSection);
 
       if (pendingOrderContext) {
-        restoreOrderFormValues(orderForm, pendingOrderContext.order);
+        restoreOrderFormValues(orderForm, pendingOrderContext.order, orderDraft);
         pendingOrderContext = null;
       }
 
@@ -106,6 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
         activateCard(confirmationSection);
 
         orderForm.reset();
+        resetOrderDraft(orderDraft);
         hideMessage(orderMessage);
         hideAlert(globalAlert);
         renderCrateOptions(
@@ -114,7 +136,12 @@ document.addEventListener('DOMContentLoaded', () => {
           submitButton,
           orderMessage,
           globalAlert,
-          { preserveAlerts: true, preserveMessage: true }
+          {
+            preserveAlerts: true,
+            preserveMessage: true,
+            selectedCrateId: orderDraft.crateId,
+            orderDraft
+          }
         );
       }, processingLabel);
     });
@@ -180,7 +207,12 @@ document.addEventListener('DOMContentLoaded', () => {
         submitButton,
         orderMessage,
         globalAlert,
-        { preserveAlerts: true, preserveMessage: true }
+        {
+          preserveAlerts: true,
+          preserveMessage: true,
+          selectedCrateId: orderDraft.crateId,
+          orderDraft
+        }
       );
       return;
     }
@@ -200,7 +232,12 @@ document.addEventListener('DOMContentLoaded', () => {
         submitButton,
         orderMessage,
         globalAlert,
-        { preserveAlerts: true, preserveMessage: true }
+        {
+          preserveAlerts: true,
+          preserveMessage: true,
+          selectedCrateId: orderDraft.crateId,
+          orderDraft
+        }
       );
       return;
     }
@@ -225,6 +262,8 @@ document.addEventListener('DOMContentLoaded', () => {
       unitPrice,
       totalPrice
     };
+
+    updateOrderDraftFromOrder(orderDraft, order);
 
     pendingOrderContext = {
       order,
@@ -303,8 +342,15 @@ function renderCrateOptions(
     return;
   }
 
-  const preserveAlerts = !!(options && typeof options === 'object' && options.preserveAlerts);
-  const preserveMessage = !!(options && typeof options === 'object' && options.preserveMessage);
+  const normalizedOptions = options && typeof options === 'object' ? options : {};
+  const preserveAlerts = !!normalizedOptions.preserveAlerts;
+  const preserveMessage = !!normalizedOptions.preserveMessage;
+  const selectedCrateId = typeof normalizedOptions.selectedCrateId === 'string'
+    ? normalizedOptions.selectedCrateId
+    : '';
+  const draftReference = normalizedOptions.orderDraft && typeof normalizedOptions.orderDraft === 'object'
+    ? normalizedOptions.orderDraft
+    : null;
 
   let availableCount = 0;
 
@@ -335,6 +381,18 @@ function renderCrateOptions(
     `;
   }).join('');
 
+  if (selectedCrateId) {
+    const selectedInput = container.querySelector(`input[name="crateSize"][value="${selectedCrateId}"]`);
+    if (selectedInput && !selectedInput.disabled) {
+      selectedInput.checked = true;
+      if (draftReference) {
+        draftReference.crateId = selectedCrateId;
+      }
+    } else if (draftReference) {
+      draftReference.crateId = '';
+    }
+  }
+
   const firstEnabled = container.querySelector('input[name="crateSize"]:not([disabled])');
   if (firstEnabled) {
     firstEnabled.required = true;
@@ -342,6 +400,13 @@ function renderCrateOptions(
 
   if (submitButton) {
     submitButton.disabled = availableCount === 0;
+  }
+
+  if (!selectedCrateId && draftReference) {
+    const checkedInput = container.querySelector('input[name="crateSize"]:checked');
+    draftReference.crateId = checkedInput && !checkedInput.disabled
+      ? checkedInput.value
+      : '';
   }
 
   if (availableCount === 0) {
@@ -444,6 +509,103 @@ function getLastOrder() {
   return null;
 }
 
+function createEmptyOrderDraft() {
+  return {
+    storeName: '',
+    storeAddress: '',
+    quantity: '',
+    crateId: ''
+  };
+}
+
+function resetOrderDraft(draft) {
+  if (!draft) {
+    return;
+  }
+
+  draft.storeName = '';
+  draft.storeAddress = '';
+  draft.quantity = '';
+  draft.crateId = '';
+}
+
+function populateOrderDraftFromForm(form, draft) {
+  if (!form || !draft) {
+    return;
+  }
+
+  draft.storeName = form?.storeName?.value ?? '';
+  draft.storeAddress = form?.storeAddress?.value ?? '';
+  draft.quantity = form?.crateQuantity?.value ?? '';
+
+  const checkedCrate = form.querySelector?.('input[name="crateSize"]:checked');
+  draft.crateId = checkedCrate && !checkedCrate.disabled
+    ? checkedCrate.value ?? ''
+    : '';
+}
+
+function updateOrderDraftField(draft, element) {
+  if (!draft || !element) {
+    return;
+  }
+
+  const name = typeof element.name === 'string' && element.name
+    ? element.name
+    : typeof element.getAttribute === 'function'
+      ? element.getAttribute('name') ?? ''
+      : '';
+
+  if (!name) {
+    return;
+  }
+
+  const rawValue = typeof element.value === 'string'
+    ? element.value
+    : element.value == null
+      ? ''
+      : String(element.value);
+
+  switch (name) {
+    case 'storeName':
+      draft.storeName = rawValue ?? '';
+      break;
+    case 'storeAddress':
+      draft.storeAddress = rawValue ?? '';
+      break;
+    case 'crateQuantity':
+      draft.quantity = rawValue ?? '';
+      break;
+    case 'crateSize':
+      if (typeof element.checked === 'boolean' && element.checked) {
+        draft.crateId = typeof element.value === 'string' && element.value
+          ? element.value
+          : rawValue ?? '';
+      }
+      break;
+    default:
+      break;
+  }
+}
+
+function updateOrderDraftFromOrder(draft, order) {
+  if (!draft || !order) {
+    return;
+  }
+
+  draft.storeName = order.storeName ?? '';
+  draft.storeAddress = order.storeAddress ?? '';
+
+  if (Number.isFinite(order.quantity)) {
+    draft.quantity = String(order.quantity);
+  } else if (typeof order.quantity === 'string') {
+    draft.quantity = order.quantity;
+  } else {
+    draft.quantity = '';
+  }
+
+  draft.crateId = order.crateId ?? '';
+}
+
 function renderOrderDetails(container, order, crateData) {
   if (!container || !order) {
     return;
@@ -453,30 +615,48 @@ function renderOrderDetails(container, order, crateData) {
   container.innerHTML = details.map((detail) => `<p>${detail}</p>`).join('');
 }
 
-function restoreOrderFormValues(form, order) {
+function restoreOrderFormValues(form, order, draft) {
   if (!form || !order) {
     return;
   }
 
   if (form.storeName) {
-    form.storeName.value = order.storeName ?? '';
+    const value = order.storeName ?? '';
+    form.storeName.value = value;
+    if (draft) {
+      draft.storeName = value;
+    }
   }
 
   if (form.storeAddress) {
-    form.storeAddress.value = order.storeAddress ?? '';
+    const value = order.storeAddress ?? '';
+    form.storeAddress.value = value;
+    if (draft) {
+      draft.storeAddress = value;
+    }
   }
 
   if (form.crateQuantity) {
-    form.crateQuantity.value = Number.isFinite(order.quantity)
+    const quantityValue = Number.isFinite(order.quantity)
       ? String(order.quantity)
       : '';
+    form.crateQuantity.value = quantityValue;
+    if (draft) {
+      draft.quantity = quantityValue;
+    }
   }
 
+  let crateIdValue = '';
   if (order.crateId) {
     const crateInput = form.querySelector(`input[name="crateSize"][value="${order.crateId}"]`);
     if (crateInput && !crateInput.disabled) {
       crateInput.checked = true;
+      crateIdValue = order.crateId;
     }
+  }
+
+  if (draft) {
+    draft.crateId = crateIdValue;
   }
 }
 
