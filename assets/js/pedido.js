@@ -715,8 +715,6 @@ function renderConfirmation(container, order, crateData) {
     summaryFragments.push(`El total estimado es ${formatCurrency(totalPrice)}.`);
   }
 
-  summaryFragments.push('Nos comunicaremos para coordinar la disponibilidad.');
-
   container.innerHTML = `
     <p class="confirmation__message">${summaryFragments.join(' ')}</p>
     <ul class="confirmation__list">
