@@ -2,7 +2,8 @@ const STORAGE_KEYS = {
   inventory: 'frigorifico_inventory',
   orders: 'frigorifico_orders',
   adminHistory: 'frigorifico_admin_history',
-  currentAdmin: 'frigorifico_current_admin'
+  currentAdmin: 'frigorifico_current_admin',
+  adminLogs: 'frigorifico_admin_logs'
 };
 
 const AUTHORIZED_ADMINS = [
@@ -17,6 +18,7 @@ const WEEK_RANGE_FORMATTER = new Intl.DateTimeFormat('es-AR', {
 
 let clearOrdersButtonRef = null;
 let currentAdminRecord = null;
+let adminLogsListRef = null;
 
 const CRATE_OPTIONS = [
   { id: 'X', label: 'Cajón X' },
@@ -43,6 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const ordersHistory = document.getElementById('ordersHistory');
   clearOrdersButtonRef = document.getElementById('clearOrdersButton');
   const adminHistoryList = document.getElementById('adminHistory');
+  adminLogsListRef = document.getElementById('adminLogs');
   const loginError = document.getElementById('loginError');
 
   let inventoryState = loadInventory();
@@ -51,6 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const hasOrders = renderOrdersHistory(ordersHistory);
   updateClearOrdersButton(hasOrders);
   renderAdminHistory(adminHistoryList);
+  renderAdminLogs(adminLogsListRef);
 
   if (clearOrdersButtonRef) {
     clearOrdersButtonRef.addEventListener('click', () => {
@@ -69,6 +73,10 @@ document.addEventListener('DOMContentLoaded', () => {
       localStorage.removeItem(STORAGE_KEYS.orders);
       const hasOrdersAfterClear = renderOrdersHistory(ordersHistory);
       updateClearOrdersButton(hasOrdersAfterClear);
+      const activeAdminName = getActiveAdminDisplayName();
+      if (activeAdminName) {
+        appendAdminLog('Borró el historial de pedidos', activeAdminName);
+      }
     });
   }
 
@@ -110,6 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
     persistAdminLogin(adminDisplayName);
     renderAdminHistory(adminHistoryList);
     updateClearOrdersButton(loadOrders().length > 0);
+    appendAdminLog('Inició sesión', adminDisplayName);
 
     localStorage.setItem(
       STORAGE_KEYS.currentAdmin,
@@ -121,6 +130,10 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   logoutButton.addEventListener('click', () => {
+    const activeAdminName = getActiveAdminDisplayName();
+    if (activeAdminName) {
+      appendAdminLog('Cerró sesión', activeAdminName);
+    }
     panelSection.classList.add('card--hidden');
     loginSection.classList.remove('card--hidden');
     hideLoginError(loginError);
@@ -154,6 +167,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     saveInventoryButton.textContent = 'Cambios guardados';
     saveInventoryButton.disabled = true;
+    const activeAdminName = getActiveAdminDisplayName();
+    if (activeAdminName) {
+      appendAdminLog('Actualizó el inventario', activeAdminName);
+    }
     setTimeout(() => {
       saveInventoryButton.textContent = 'Guardar cambios';
       saveInventoryButton.disabled = false;
@@ -238,6 +255,19 @@ function parseStoredAdmin(rawValue) {
   }
 
   return null;
+}
+
+function getActiveAdminDisplayName() {
+  if (currentAdminRecord) {
+    return (
+      currentAdminRecord.displayName
+      ?? currentAdminRecord.name
+      ?? currentAdminRecord.username
+      ?? ''
+    );
+  }
+
+  return '';
 }
 
 function showLoginError(container, message) {
@@ -518,6 +548,66 @@ function renderAdminHistory(container) {
     .map((entry) => `
       <li>
         <strong>${entry.name}</strong><br>
+        ${formatter.format(new Date(entry.timestamp))}
+      </li>
+    `)
+    .join('');
+}
+
+function loadAdminLogs() {
+  const stored = localStorage.getItem(STORAGE_KEYS.adminLogs);
+  if (!stored) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(stored);
+    if (Array.isArray(parsed)) {
+      return parsed;
+    }
+  } catch (error) {
+    console.error('Error al leer el registro de acciones', error);
+  }
+
+  return [];
+}
+
+function appendAdminLog(action, adminName) {
+  if (!action || !adminName) {
+    return;
+  }
+
+  const logs = loadAdminLogs();
+  logs.push({ action, admin: adminName, timestamp: Date.now() });
+  const trimmedLogs = logs.slice(-50);
+  localStorage.setItem(STORAGE_KEYS.adminLogs, JSON.stringify(trimmedLogs));
+  renderAdminLogs(adminLogsListRef);
+}
+
+function renderAdminLogs(container) {
+  if (!container) {
+    return;
+  }
+
+  const logs = loadAdminLogs();
+
+  if (!logs.length) {
+    container.innerHTML = '<li class="history__empty">Aún no hay acciones registradas.</li>';
+    return;
+  }
+
+  const formatter = new Intl.DateTimeFormat('es-AR', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  });
+
+  container.innerHTML = logs
+    .slice()
+    .reverse()
+    .map((entry) => `
+      <li>
+        <strong>${entry.admin}</strong><br>
+        ${entry.action}<br>
         ${formatter.format(new Date(entry.timestamp))}
       </li>
     `)

@@ -54,9 +54,12 @@ document.addEventListener('DOMContentLoaded', () => {
       reviewSection.classList.add('card--hidden');
       confirmationSection.classList.add('card--hidden');
       orderSection.classList.remove('card--hidden');
+
       if (pendingOrderContext) {
+        restoreOrderFormValues(orderForm, pendingOrderContext.order);
         pendingOrderContext = null;
       }
+
       const firstInvalid = orderForm.querySelector(':invalid');
       if (firstInvalid) {
         firstInvalid.focus();
@@ -305,6 +308,9 @@ function renderCrateOptions(
     if (price > 0) {
       metaParts.push(`Precio: ${formatCurrency(price)}`);
     }
+    if (!available) {
+      metaParts.push('Producto sin stock por el momento');
+    }
     const metaText = metaParts.join(' · ');
 
     return `
@@ -432,6 +438,33 @@ function renderOrderDetails(container, order, crateData) {
 
   const details = buildOrderDetails(order, crateData);
   container.innerHTML = details.map((detail) => `<p>${detail}</p>`).join('');
+}
+
+function restoreOrderFormValues(form, order) {
+  if (!form || !order) {
+    return;
+  }
+
+  if (form.storeName) {
+    form.storeName.value = order.storeName ?? '';
+  }
+
+  if (form.storeAddress) {
+    form.storeAddress.value = order.storeAddress ?? '';
+  }
+
+  if (form.crateQuantity) {
+    form.crateQuantity.value = Number.isFinite(order.quantity)
+      ? String(order.quantity)
+      : '';
+  }
+
+  if (order.crateId) {
+    const crateInput = form.querySelector(`input[name="crateSize"][value="${order.crateId}"]`);
+    if (crateInput && !crateInput.disabled) {
+      crateInput.checked = true;
+    }
+  }
 }
 
 function buildOrderDetails(order, crateData) {
