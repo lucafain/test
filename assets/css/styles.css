@@ -265,11 +265,24 @@ a {
 }
 
 .form input[type="text"],
-.form input[type="number"] {
+.form input[type="number"],
+.form select {
   padding: 0.75rem 1rem;
   border-radius: var(--radius);
   border: 1px solid #d8dee4;
   font-size: 1rem;
+  background-color: #fff;
+}
+
+.adminManagement__actions {
+  display: grid;
+  gap: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .adminManagement__actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .form__fieldset {

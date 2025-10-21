@@ -135,14 +135,27 @@
         <section class="card card--hidden" id="adminManagementSection">
           <h3>Gestión de administradores</h3>
           <p>Agregue nuevos administradores autorizados para el panel.</p>
-          <form id="addAdminForm" class="form">
-            <label for="newAdminName">Nombre del nuevo administrador</label>
-            <input id="newAdminName" name="newAdminName" type="text" placeholder="Ej: Ana" autocomplete="off">
-            <label for="newAdminPassword">Contraseña</label>
-            <input id="newAdminPassword" name="newAdminPassword" type="password" placeholder="Defina una contraseña segura">
-            <p class="form__message" id="addAdminMessage" hidden aria-live="polite"></p>
-            <button class="button" type="submit">Agregar administrador</button>
-          </form>
+          <div class="adminManagement__actions">
+            <form id="addAdminForm" class="form">
+              <label for="newAdminName">Nombre del nuevo administrador</label>
+              <input id="newAdminName" name="newAdminName" type="text" placeholder="Ej: Ana" autocomplete="off">
+              <label for="newAdminPassword">Contraseña</label>
+              <input id="newAdminPassword" name="newAdminPassword" type="password" placeholder="Defina una contraseña segura">
+              <p class="form__message" id="addAdminMessage" hidden aria-live="polite"></p>
+              <button class="button" type="submit">Agregar administrador</button>
+            </form>
+            <form id="updateAdminPasswordForm" class="form" hidden>
+              <fieldset class="form__fieldset">
+                <legend>Cambiar contraseña</legend>
+                <label for="adminPasswordTarget">Seleccione a quién actualizar</label>
+                <select id="adminPasswordTarget" name="adminPasswordTarget"></select>
+                <label for="adminPasswordValue">Nueva contraseña</label>
+                <input id="adminPasswordValue" name="adminPasswordValue" type="password" placeholder="Ingrese la nueva contraseña">
+                <p class="form__message" id="updateAdminPasswordMessage" hidden aria-live="polite"></p>
+                <button class="button" type="submit">Actualizar contraseña</button>
+              </fieldset>
+            </form>
+          </div>
           <ul class="history" id="customAdminsList"></ul>
         </section>
       </div>

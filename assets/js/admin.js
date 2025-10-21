@@ -5,7 +5,8 @@ const STORAGE_KEYS = {
   adminLogs: 'frigorifico_admin_logs',
   payments: 'frigorifico_payment_status',
   paymentLogs: 'frigorifico_payment_logs',
-  customAdmins: 'frigorifico_custom_admins'
+  customAdmins: 'frigorifico_custom_admins',
+  adminOverrides: 'frigorifico_admin_overrides'
 };
 
 const AUTHORIZED_ADMINS = [
@@ -19,7 +20,12 @@ const AUTHORIZED_ADMINS = [
     username: 'luca',
     password: 'Luca-admin',
     displayName: 'Luca',
-    permissions: { managePayments: true, clearOrders: true, manageAdmins: true }
+    permissions: {
+      managePayments: true,
+      clearOrders: true,
+      manageAdmins: true,
+      manageAdminPasswords: true
+    }
   },
   {
     username: 'franco',
@@ -106,6 +112,10 @@ let addAdminFormRef = null;
 let addAdminMessageRef = null;
 let customAdminsListRef = null;
 let addAdminMessageTimeout = null;
+let updateAdminPasswordFormRef = null;
+let updateAdminPasswordMessageRef = null;
+let updateAdminPasswordSelectRef = null;
+let updateAdminPasswordMessageTimeout = null;
 let paymentsVisible = false;
 let paymentOrdersCache = new Map();
 let paymentWeekOptions = [];
@@ -154,6 +164,17 @@ document.addEventListener('DOMContentLoaded', () => {
   adminManagementSectionRef = document.getElementById('adminManagementSection');
   addAdminFormRef = document.getElementById('addAdminForm');
   addAdminMessageRef = document.getElementById('addAdminMessage');
+  updateAdminPasswordFormRef = document.getElementById('updateAdminPasswordForm');
+  updateAdminPasswordMessageRef = document.getElementById('updateAdminPasswordMessage');
+  updateAdminPasswordSelectRef = document.getElementById('adminPasswordTarget');
+  if (updateAdminPasswordSelectRef) {
+    updateAdminPasswordSelectRef.addEventListener('change', () => {
+      updateAdminPasswordSelectRef.setAttribute(
+        'data-last-selection',
+        updateAdminPasswordSelectRef.value
+      );
+    });
+  }
   customAdminsListRef = document.getElementById('customAdminsList');
   const loginError = document.getElementById('loginError');
   const processingSection = document.getElementById('adminProcessingSection');
@@ -335,10 +356,108 @@ document.addEventListener('DOMContentLoaded', () => {
       renderCustomAdminsList(customAdminsListRef);
       addAdminFormRef.reset();
       showAddAdminMessage(`Se agregó a ${name} como administrador.`, 'success');
+      refreshAdminPasswordOptions();
 
       const activeAdminName = getActiveAdminDisplayName();
       if (activeAdminName) {
         appendAdminLog(`Agregó a ${name} como administrador`, activeAdminName);
+      }
+    });
+  }
+
+  if (updateAdminPasswordFormRef) {
+    updateAdminPasswordFormRef.addEventListener('submit', (event) => {
+      event.preventDefault();
+
+      if (
+        !currentAdminRecord
+        || !hasAdminPermission(currentAdminRecord, 'manageAdminPasswords')
+      ) {
+        return;
+      }
+
+      const formData = new FormData(updateAdminPasswordFormRef);
+      const targetIdentifier = (formData.get('adminPasswordTarget') || '').toString().trim();
+      const newPassword = (formData.get('adminPasswordValue') || '').toString();
+
+      if (!targetIdentifier) {
+        showUpdateAdminPasswordMessage('Seleccione un administrador a actualizar.', 'error');
+        if (updateAdminPasswordSelectRef) {
+          updateAdminPasswordSelectRef.focus();
+        }
+        return;
+      }
+
+      if (!newPassword) {
+        showUpdateAdminPasswordMessage('Ingrese la nueva contraseña.', 'error');
+        if (updateAdminPasswordFormRef.adminPasswordValue) {
+          updateAdminPasswordFormRef.adminPasswordValue.focus();
+        }
+        return;
+      }
+
+      const adminRecord = findAuthorizedAdminByIdentifier(targetIdentifier);
+
+      if (!adminRecord) {
+        showUpdateAdminPasswordMessage('No se encontró el administrador seleccionado.', 'error');
+        return;
+      }
+
+      const normalizedTarget = normalizeAdminIdentifier(
+        adminRecord.username
+          ?? adminRecord.displayName
+          ?? adminRecord.name
+          ?? targetIdentifier
+      );
+
+      if (!normalizedTarget) {
+        showUpdateAdminPasswordMessage('Seleccione un administrador válido.', 'error');
+        return;
+      }
+
+      const customAdmins = loadCustomAdmins();
+      const targetIndex = customAdmins.findIndex(
+        (entry) => normalizeAdminIdentifier(entry.username) === normalizedTarget
+      );
+
+      if (targetIndex >= 0) {
+        const updatedAdmins = customAdmins.slice();
+        updatedAdmins[targetIndex] = {
+          ...updatedAdmins[targetIndex],
+          password: newPassword
+        };
+        saveCustomAdmins(updatedAdmins);
+        renderCustomAdminsList(customAdminsListRef);
+      } else {
+        upsertAdminOverride(
+          adminRecord.username ?? adminRecord.displayName ?? targetIdentifier,
+          newPassword
+        );
+      }
+
+      const preferredValue = targetIdentifier;
+      refreshAdminPasswordOptions(preferredValue);
+
+      if (updateAdminPasswordFormRef.adminPasswordValue) {
+        updateAdminPasswordFormRef.adminPasswordValue.value = '';
+      }
+
+      if (updateAdminPasswordSelectRef) {
+        updateAdminPasswordSelectRef.value = preferredValue;
+        updateAdminPasswordSelectRef.setAttribute('data-last-selection', preferredValue);
+      }
+
+      showUpdateAdminPasswordMessage(
+        `Se actualizó la contraseña de ${adminRecord.displayName ?? adminRecord.username}.`,
+        'success'
+      );
+
+      const activeAdminName = getActiveAdminDisplayName();
+      if (activeAdminName) {
+        appendAdminLog(
+          `Actualizó la contraseña de ${adminRecord.displayName ?? adminRecord.username}`,
+          activeAdminName
+        );
       }
     });
   }
@@ -489,6 +608,7 @@ document.addEventListener('DOMContentLoaded', () => {
     saveInventoryButton.disabled = false;
   });
 
+  refreshAdminPasswordOptions();
   updateAdminPermissions(null);
   activateCard(loginSection);
 });
@@ -498,7 +618,29 @@ function getAuthorizedAdmin(name) {
     return null;
   }
 
-  return findAuthorizedAdminByIdentifier(name);
+  const adminRecord = findAuthorizedAdminByIdentifier(name);
+
+  if (!adminRecord) {
+    return null;
+  }
+
+  const identifier = (
+    adminRecord.username
+    ?? adminRecord.displayName
+    ?? adminRecord.name
+    ?? name
+  );
+
+  const override = getAdminOverrideFor(identifier);
+
+  if (override) {
+    return {
+      ...adminRecord,
+      password: override.password
+    };
+  }
+
+  return adminRecord;
 }
 
 function hasAdminPermission(adminRecord, permissionKey) {
@@ -820,12 +962,29 @@ function updateAdminPermissions(adminRecord) {
     if (hasAdminPermission(adminRecord, 'manageAdmins')) {
       adminManagementSectionRef.classList.remove('card--hidden');
       renderCustomAdminsList(customAdminsListRef);
+      if (updateAdminPasswordFormRef) {
+        if (hasAdminPermission(adminRecord, 'manageAdminPasswords')) {
+          updateAdminPasswordFormRef.hidden = false;
+          refreshAdminPasswordOptions(
+            updateAdminPasswordSelectRef ? updateAdminPasswordSelectRef.value : undefined
+          );
+        } else {
+          updateAdminPasswordFormRef.hidden = true;
+          updateAdminPasswordFormRef.reset();
+          hideUpdateAdminPasswordMessage();
+        }
+      }
     } else {
       adminManagementSectionRef.classList.add('card--hidden');
       if (addAdminFormRef) {
         addAdminFormRef.reset();
       }
       hideAddAdminMessage();
+      if (updateAdminPasswordFormRef) {
+        updateAdminPasswordFormRef.hidden = true;
+        updateAdminPasswordFormRef.reset();
+      }
+      hideUpdateAdminPasswordMessage();
     }
   }
 
@@ -1482,6 +1641,137 @@ function saveCustomAdmins(admins) {
   }
 }
 
+function sanitizeAdminOverrideEntry(entry) {
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+    return null;
+  }
+
+  const usernameValue = typeof entry.username === 'string'
+    ? entry.username.trim()
+    : '';
+
+  const passwordValue = typeof entry.password === 'string'
+    ? entry.password
+    : '';
+
+  if (!usernameValue || !passwordValue) {
+    return null;
+  }
+
+  return {
+    username: usernameValue,
+    password: passwordValue
+  };
+}
+
+function loadAdminOverrides() {
+  const stored = localStorage.getItem(STORAGE_KEYS.adminOverrides);
+
+  if (!stored) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(stored);
+    if (Array.isArray(parsed)) {
+      const deduplicated = new Map();
+
+      parsed.forEach((entry) => {
+        const sanitized = sanitizeAdminOverrideEntry(entry);
+        if (!sanitized) {
+          return;
+        }
+
+        const key = normalizeAdminIdentifier(sanitized.username);
+        if (!key) {
+          return;
+        }
+
+        deduplicated.set(key, sanitized);
+      });
+
+      return Array.from(deduplicated.values());
+    }
+  } catch (error) {
+    console.error('Error al leer contraseñas personalizadas de administradores', error);
+  }
+
+  return [];
+}
+
+function saveAdminOverrides(entries) {
+  if (!Array.isArray(entries)) {
+    localStorage.removeItem(STORAGE_KEYS.adminOverrides);
+    return;
+  }
+
+  const deduplicated = new Map();
+
+  entries.forEach((entry) => {
+    const sanitized = sanitizeAdminOverrideEntry(entry);
+    if (!sanitized) {
+      return;
+    }
+
+    const key = normalizeAdminIdentifier(sanitized.username);
+    if (!key) {
+      return;
+    }
+
+    deduplicated.set(key, sanitized);
+  });
+
+  const serialized = JSON.stringify(Array.from(deduplicated.values()));
+
+  try {
+    localStorage.setItem(STORAGE_KEYS.adminOverrides, serialized);
+  } catch (error) {
+    console.error('Error al guardar contraseñas personalizadas de administradores', error);
+  }
+}
+
+function upsertAdminOverride(username, password) {
+  const sanitizedUsername = typeof username === 'string'
+    ? username.trim()
+    : '';
+
+  const sanitizedPassword = typeof password === 'string'
+    ? password
+    : '';
+
+  if (!sanitizedUsername || !sanitizedPassword) {
+    return;
+  }
+
+  const overrides = loadAdminOverrides();
+  const normalized = normalizeAdminIdentifier(sanitizedUsername);
+  const filtered = overrides.filter(
+    (entry) => normalizeAdminIdentifier(entry.username) !== normalized
+  );
+
+  filtered.push({
+    username: sanitizedUsername,
+    password: sanitizedPassword
+  });
+
+  saveAdminOverrides(filtered);
+}
+
+function getAdminOverrideFor(identifier) {
+  const normalized = normalizeAdminIdentifier(identifier);
+
+  if (!normalized) {
+    return null;
+  }
+
+  const overrides = loadAdminOverrides();
+
+  return (
+    overrides.find((entry) => normalizeAdminIdentifier(entry.username) === normalized)
+    ?? null
+  );
+}
+
 function renderCustomAdminsList(container) {
   if (!container) {
     return;
@@ -1491,6 +1781,7 @@ function renderCustomAdminsList(container) {
 
   if (!admins.length) {
     container.innerHTML = '<li class="history__empty">Aún no hay administradores agregados.</li>';
+    refreshAdminPasswordOptions();
     return;
   }
 
@@ -1501,6 +1792,62 @@ function renderCustomAdminsList(container) {
       </li>
     `)
     .join('');
+
+  refreshAdminPasswordOptions();
+}
+
+function refreshAdminPasswordOptions(preferredValue) {
+  if (!updateAdminPasswordSelectRef) {
+    return;
+  }
+
+  const admins = getAllAuthorizedAdmins();
+  const entriesMap = new Map();
+
+  admins.forEach((admin) => {
+    const identifier = admin.username ?? admin.displayName ?? admin.name ?? '';
+    const normalized = normalizeAdminIdentifier(identifier);
+    if (!normalized) {
+      return;
+    }
+
+    const label = admin.displayName ?? admin.username ?? admin.name ?? identifier;
+    entriesMap.set(normalized, {
+      value: identifier,
+      label
+    });
+  });
+
+  const entries = Array.from(entriesMap.values()).sort((a, b) =>
+    a.label.localeCompare(b.label, 'es', { sensitivity: 'base' })
+  );
+
+  if (!entries.length) {
+    updateAdminPasswordSelectRef.innerHTML = '<option value="" disabled>No hay administradores disponibles</option>';
+    updateAdminPasswordSelectRef.value = '';
+    updateAdminPasswordSelectRef.disabled = true;
+    updateAdminPasswordSelectRef.removeAttribute('data-last-selection');
+    return;
+  }
+
+  updateAdminPasswordSelectRef.disabled = false;
+  updateAdminPasswordSelectRef.innerHTML = entries
+    .map((entry) => `
+      <option value="${entry.value}">${entry.label}</option>
+    `)
+    .join('');
+
+  const lastSelection = updateAdminPasswordSelectRef.getAttribute('data-last-selection');
+  const desiredValue = preferredValue ?? lastSelection ?? entries[0].value;
+  const matchedEntry = entries.find((entry) => entry.value === desiredValue);
+
+  if (matchedEntry) {
+    updateAdminPasswordSelectRef.value = matchedEntry.value;
+  } else {
+    updateAdminPasswordSelectRef.value = entries[0].value;
+  }
+
+  updateAdminPasswordSelectRef.setAttribute('data-last-selection', updateAdminPasswordSelectRef.value);
 }
 
 function showAddAdminMessage(message, type) {
@@ -1541,6 +1888,46 @@ function hideAddAdminMessage() {
   addAdminMessageRef.textContent = '';
   addAdminMessageRef.hidden = true;
   addAdminMessageRef.classList.remove('form__message--error', 'form__message--success');
+}
+
+function showUpdateAdminPasswordMessage(message, type) {
+  if (!updateAdminPasswordMessageRef) {
+    return;
+  }
+
+  if (updateAdminPasswordMessageTimeout) {
+    clearTimeout(updateAdminPasswordMessageTimeout);
+    updateAdminPasswordMessageTimeout = null;
+  }
+
+  updateAdminPasswordMessageRef.textContent = message;
+  updateAdminPasswordMessageRef.hidden = false;
+  updateAdminPasswordMessageRef.classList.remove('form__message--error', 'form__message--success');
+
+  if (type === 'error') {
+    updateAdminPasswordMessageRef.classList.add('form__message--error');
+  } else if (type === 'success') {
+    updateAdminPasswordMessageRef.classList.add('form__message--success');
+  }
+
+  updateAdminPasswordMessageTimeout = setTimeout(() => {
+    hideUpdateAdminPasswordMessage();
+  }, 4000);
+}
+
+function hideUpdateAdminPasswordMessage() {
+  if (!updateAdminPasswordMessageRef) {
+    return;
+  }
+
+  if (updateAdminPasswordMessageTimeout) {
+    clearTimeout(updateAdminPasswordMessageTimeout);
+    updateAdminPasswordMessageTimeout = null;
+  }
+
+  updateAdminPasswordMessageRef.textContent = '';
+  updateAdminPasswordMessageRef.hidden = true;
+  updateAdminPasswordMessageRef.classList.remove('form__message--error', 'form__message--success');
 }
 
 function formatCurrencyValue(value) {
